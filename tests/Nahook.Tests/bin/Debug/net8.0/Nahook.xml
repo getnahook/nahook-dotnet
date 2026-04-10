@@ -1,0 +1,124 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Nahook</name>
+    </assembly>
+    <members>
+        <member name="T:Nahook.NahookException">
+            <summary>
+            Base exception for all Nahook SDK errors.
+            </summary>
+        </member>
+        <member name="T:Nahook.NahookApiException">
+            <summary>
+            Thrown when the Nahook API returns an error response (4xx/5xx).
+            </summary>
+        </member>
+        <member name="T:Nahook.NahookNetworkException">
+            <summary>
+            Thrown when a network-level error occurs (DNS, connection refused, etc.).
+            </summary>
+        </member>
+        <member name="T:Nahook.NahookTimeoutException">
+            <summary>
+            Thrown when a request exceeds the configured timeout.
+            </summary>
+        </member>
+        <member name="T:Nahook.NahookClient">
+            <summary>
+            Ingestion client for sending webhooks via the Nahook API.
+            Uses API keys with the <c>nhk_</c> prefix.
+            </summary>
+        </member>
+        <member name="M:Nahook.NahookClient.#ctor(System.String,Nahook.NahookClientOptions)">
+            <summary>
+            Creates a new ingestion client.
+            </summary>
+            <param name="apiKey">API key (must start with <c>nhk_</c>).</param>
+            <param name="options">Optional client configuration.</param>
+        </member>
+        <member name="M:Nahook.NahookClient.SendAsync(System.String,Nahook.SendOptions,System.Threading.CancellationToken)">
+            <summary>
+            Sends a webhook to a specific endpoint.
+            </summary>
+        </member>
+        <member name="M:Nahook.NahookClient.TriggerAsync(System.String,Nahook.TriggerOptions,System.Threading.CancellationToken)">
+            <summary>
+            Triggers an event type, delivering to all subscribed endpoints.
+            </summary>
+        </member>
+        <member name="M:Nahook.NahookClient.SendBatchAsync(System.Collections.Generic.IEnumerable{Nahook.SendBatchItem},System.Threading.CancellationToken)">
+            <summary>
+            Sends a batch of webhooks to specific endpoints.
+            </summary>
+        </member>
+        <member name="M:Nahook.NahookClient.TriggerBatchAsync(System.Collections.Generic.IEnumerable{Nahook.TriggerBatchItem},System.Threading.CancellationToken)">
+            <summary>
+            Triggers a batch of event types.
+            </summary>
+        </member>
+        <member name="T:Nahook.NahookClientOptions">
+            <summary>
+            Configuration options for <see cref="T:Nahook.NahookClient"/>.
+            </summary>
+        </member>
+        <member name="P:Nahook.NahookClientOptions.BaseUrl">
+            <summary>Base URL of the Nahook API. Defaults to https://api.nahook.com.</summary>
+        </member>
+        <member name="P:Nahook.NahookClientOptions.TimeoutMs">
+            <summary>Request timeout in milliseconds. Defaults to 30000.</summary>
+        </member>
+        <member name="P:Nahook.NahookClientOptions.Retries">
+            <summary>Number of retries for retryable errors. Defaults to 0.</summary>
+        </member>
+        <member name="T:Nahook.NahookManagement">
+            <summary>
+            Management client for administering Nahook workspaces, endpoints, event types, etc.
+            Uses management tokens with the <c>nhm_</c> prefix.
+            </summary>
+        </member>
+        <member name="M:Nahook.NahookManagement.#ctor(System.String,Nahook.NahookManagementOptions)">
+            <summary>
+            Creates a new management client.
+            </summary>
+            <param name="token">Management token (must start with <c>nhm_</c>).</param>
+            <param name="options">Optional client configuration.</param>
+        </member>
+        <member name="T:Nahook.NahookManagementOptions">
+            <summary>
+            Configuration options for <see cref="T:Nahook.NahookManagement"/>.
+            </summary>
+        </member>
+        <member name="P:Nahook.NahookManagementOptions.BaseUrl">
+            <summary>Base URL of the Nahook API. Defaults to https://api.nahook.com.</summary>
+        </member>
+        <member name="P:Nahook.NahookManagementOptions.TimeoutMs">
+            <summary>Request timeout in milliseconds. Defaults to 30000.</summary>
+        </member>
+        <member name="T:Nahook.EndpointsResource">
+            <summary>
+            Manages endpoints within a workspace.
+            </summary>
+        </member>
+        <member name="T:Nahook.EventTypesResource">
+            <summary>
+            Manages event types within a workspace.
+            </summary>
+        </member>
+        <member name="T:Nahook.ApplicationsResource">
+            <summary>
+            Manages applications within a workspace.
+            </summary>
+        </member>
+        <member name="T:Nahook.SubscriptionsResource">
+            <summary>
+            Manages subscriptions on endpoints within a workspace.
+            </summary>
+        </member>
+        <member name="T:Nahook.PortalSessionsResource">
+            <summary>
+            Creates portal sessions for applications within a workspace.
+            </summary>
+        </member>
+    </members>
+</doc>
