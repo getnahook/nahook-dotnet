@@ -1,0 +1,13 @@
+/app/src/Nahook/bin/Debug/net6.0/Nahook.deps.json
+/app/src/Nahook/bin/Debug/net6.0/Nahook.dll
+/app/src/Nahook/bin/Debug/net6.0/Nahook.pdb
+/app/src/Nahook/bin/Debug/net6.0/Nahook.xml
+/app/src/Nahook/obj/Debug/net6.0/Nahook.GeneratedMSBuildEditorConfig.editorconfig
+/app/src/Nahook/obj/Debug/net6.0/Nahook.AssemblyInfoInputs.cache
+/app/src/Nahook/obj/Debug/net6.0/Nahook.AssemblyInfo.cs
+/app/src/Nahook/obj/Debug/net6.0/Nahook.csproj.CoreCompileInputs.cache
+/app/src/Nahook/obj/Debug/net6.0/Nahook.dll
+/app/src/Nahook/obj/Debug/net6.0/refint/Nahook.dll
+/app/src/Nahook/obj/Debug/net6.0/Nahook.xml
+/app/src/Nahook/obj/Debug/net6.0/Nahook.pdb
+/app/src/Nahook/obj/Debug/net6.0/ref/Nahook.dll
