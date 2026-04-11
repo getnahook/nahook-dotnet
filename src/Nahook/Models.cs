@@ -305,6 +305,60 @@ public sealed class CreatePortalSessionOptions
     public Dictionary<string, string>? Metadata { get; set; }
 }
 
+public sealed class Environment
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("slug")]
+    public string Slug { get; set; } = string.Empty;
+
+    [JsonPropertyName("isDefault")]
+    public bool IsDefault { get; set; }
+
+    [JsonPropertyName("createdAt")]
+    public string CreatedAt { get; set; } = string.Empty;
+
+    [JsonPropertyName("updatedAt")]
+    public string UpdatedAt { get; set; } = string.Empty;
+}
+
+public sealed class CreateEnvironmentOptions
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("slug")]
+    public string Slug { get; set; } = string.Empty;
+}
+
+public sealed class UpdateEnvironmentOptions
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+}
+
+public sealed class EventTypeVisibility
+{
+    [JsonPropertyName("eventTypeId")]
+    public string EventTypeId { get; set; } = string.Empty;
+
+    [JsonPropertyName("eventTypeName")]
+    public string EventTypeName { get; set; } = string.Empty;
+
+    [JsonPropertyName("published")]
+    public bool Published { get; set; }
+}
+
+public sealed class SetVisibilityOptions
+{
+    [JsonPropertyName("published")]
+    public bool Published { get; set; }
+}
+
 public sealed class ListResult<T>
 {
     [JsonPropertyName("data")]

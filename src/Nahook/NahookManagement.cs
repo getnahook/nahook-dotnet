@@ -35,6 +35,7 @@ public sealed class NahookManagement : IDisposable
         Applications = new ApplicationsResource(_http);
         Subscriptions = new SubscriptionsResource(_http);
         PortalSessions = new PortalSessionsResource(_http);
+        Environments = new EnvironmentsResource(_http);
     }
 
     // Internal constructor for testing with a custom handler.
@@ -58,6 +59,7 @@ public sealed class NahookManagement : IDisposable
         Applications = new ApplicationsResource(_http);
         Subscriptions = new SubscriptionsResource(_http);
         PortalSessions = new PortalSessionsResource(_http);
+        Environments = new EnvironmentsResource(_http);
     }
 
     public EndpointsResource Endpoints { get; }
@@ -65,6 +67,7 @@ public sealed class NahookManagement : IDisposable
     public ApplicationsResource Applications { get; }
     public SubscriptionsResource Subscriptions { get; }
     public PortalSessionsResource PortalSessions { get; }
+    public EnvironmentsResource Environments { get; }
 
     public void Dispose()
     {
