@@ -18,6 +18,23 @@ internal sealed class NahookHttpClient : IDisposable
     private const int MaxDelayMs = 10_000;
     private const string SdkVersion = "0.1.0";
 
+    private static readonly Dictionary<string, string> RegionBaseUrls = new()
+    {
+        ["us"] = "https://us.api.nahook.com",
+        ["eu"] = "https://eu.api.nahook.com",
+        ["ap"] = "https://ap.api.nahook.com",
+    };
+
+    private static string ResolveBaseUrl(string token)
+    {
+        if (token.Length >= 7 && token.StartsWith("nhk_", StringComparison.Ordinal) && token[6] == '_')
+        {
+            var slug = token.Substring(4, 2);
+            if (RegionBaseUrls.TryGetValue(slug, out var url)) return url;
+        }
+        return DefaultBaseUrl;
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -34,7 +51,7 @@ internal sealed class NahookHttpClient : IDisposable
     public NahookHttpClient(string token, string? baseUrl = null, int? timeoutMs = null, int? retries = null)
     {
         _token = token;
-        _baseUrl = (baseUrl ?? DefaultBaseUrl).TrimEnd('/');
+        _baseUrl = (baseUrl ?? ResolveBaseUrl(token)).TrimEnd('/');
         _timeoutMs = timeoutMs ?? DefaultTimeoutMs;
         _retries = retries ?? 0;
 
@@ -47,7 +64,7 @@ internal sealed class NahookHttpClient : IDisposable
     internal NahookHttpClient(string token, HttpMessageHandler handler, string? baseUrl = null, int? timeoutMs = null, int? retries = null)
     {
         _token = token;
-        _baseUrl = (baseUrl ?? DefaultBaseUrl).TrimEnd('/');
+        _baseUrl = (baseUrl ?? ResolveBaseUrl(token)).TrimEnd('/');
         _timeoutMs = timeoutMs ?? DefaultTimeoutMs;
         _retries = retries ?? 0;
 
