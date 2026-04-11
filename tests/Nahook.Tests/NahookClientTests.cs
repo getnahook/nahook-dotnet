@@ -450,3 +450,94 @@ public sealed class HttpHeaderTests
         Assert.Contains(handler.LastRequest!.Headers.UserAgent, p => p.Product != null && p.Product.Name == "nahook-dotnet");
     }
 }
+
+// ──────────────────────────────────────────────
+// Regional Routing Tests
+// ──────────────────────────────────────────────
+
+public sealed class RegionalRoutingTests
+{
+    [Fact]
+    public void ResolveBaseUrl_us_region_returns_us_base_url()
+    {
+        var url = NahookHttpClient.ResolveBaseUrl("nhk_us_abc123");
+        Assert.Equal("https://us.api.nahook.com", url);
+    }
+
+    [Fact]
+    public void ResolveBaseUrl_eu_region_returns_eu_base_url()
+    {
+        var url = NahookHttpClient.ResolveBaseUrl("nhk_eu_abc123");
+        Assert.Equal("https://eu.api.nahook.com", url);
+    }
+
+    [Fact]
+    public void ResolveBaseUrl_ap_region_returns_ap_base_url()
+    {
+        var url = NahookHttpClient.ResolveBaseUrl("nhk_ap_abc123");
+        Assert.Equal("https://ap.api.nahook.com", url);
+    }
+
+    [Fact]
+    public void ResolveBaseUrl_unknown_region_falls_back_to_default()
+    {
+        var url = NahookHttpClient.ResolveBaseUrl("nhk_zz_abc123");
+        Assert.Equal("https://api.nahook.com", url);
+    }
+
+    [Fact]
+    public void BaseUrl_option_overrides_region_resolution()
+    {
+        using var handler = new TestHttpMessageHandler();
+        using var client = new NahookClient("nhk_eu_abc123", handler, new NahookClientOptions
+        {
+            BaseUrl = "https://custom.nahook.com"
+        });
+
+        // The client should use the explicit baseUrl, not the eu region URL.
+        // We verify by making a request and checking the URL used.
+        var result = client.SendAsync("ep_1", new SendOptions
+        {
+            Payload = new Dictionary<string, object> { ["e"] = "test" }
+        }).GetAwaiter().GetResult();
+
+        Assert.StartsWith("https://custom.nahook.com/", handler.LastRequest!.RequestUri!.ToString());
+    }
+}
+
+// ──────────────────────────────────────────────
+// Retry Delay Tests
+// ──────────────────────────────────────────────
+
+public sealed class RetryDelayTests
+{
+    [Fact]
+    public void ComputeDelay_returns_value_between_zero_and_exponential_cap()
+    {
+        // attempt 0: cap = BaseDelayMs * 2^0 = 500
+        // Full jitter: result should be in [0, 500]
+        for (int i = 0; i < 100; i++)
+        {
+            int delay = NahookHttpClient.ComputeDelay(0, null);
+            Assert.InRange(delay, 0, NahookHttpClient.BaseDelayMs);
+        }
+    }
+
+    [Fact]
+    public void ComputeDelay_caps_at_max_delay()
+    {
+        // attempt 20: exponential = 500 * 2^20 = huge, should be capped at MaxDelayMs
+        for (int i = 0; i < 100; i++)
+        {
+            int delay = NahookHttpClient.ComputeDelay(20, null);
+            Assert.InRange(delay, 0, NahookHttpClient.MaxDelayMs);
+        }
+    }
+
+    [Fact]
+    public void ComputeDelay_uses_retry_after_seconds_when_provided()
+    {
+        int delay = NahookHttpClient.ComputeDelay(0, 3);
+        Assert.Equal(3000, delay);
+    }
+}

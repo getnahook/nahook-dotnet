@@ -14,8 +14,8 @@ internal sealed class NahookHttpClient : IDisposable
 {
     private const string DefaultBaseUrl = "https://api.nahook.com";
     private const int DefaultTimeoutMs = 30_000;
-    private const int BaseDelayMs = 500;
-    private const int MaxDelayMs = 10_000;
+    internal const int BaseDelayMs = 500;
+    internal const int MaxDelayMs = 10_000;
     private const string SdkVersion = "0.1.0";
 
     private static readonly Dictionary<string, string> RegionBaseUrls = new()
@@ -25,7 +25,7 @@ internal sealed class NahookHttpClient : IDisposable
         ["ap"] = "https://ap.api.nahook.com",
     };
 
-    private static string ResolveBaseUrl(string token)
+    internal static string ResolveBaseUrl(string token)
     {
         if (token.Length >= 7 && token.StartsWith("nhk_", StringComparison.Ordinal) && token[6] == '_')
         {
@@ -231,7 +231,7 @@ internal sealed class NahookHttpClient : IDisposable
         return sb.ToString();
     }
 
-    private static int ComputeDelay(int attempt, int? retryAfterSeconds)
+    internal static int ComputeDelay(int attempt, int? retryAfterSeconds)
     {
         if (retryAfterSeconds.HasValue && retryAfterSeconds.Value > 0)
         {
