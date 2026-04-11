@@ -19,11 +19,11 @@ public sealed class ClientIntegrationTests : IDisposable
 
     public ClientIntegrationTests()
     {
-        var apiUrl = Environment.GetEnvironmentVariable("NAHOOK_TEST_API_URL");
-        var apiKey = Environment.GetEnvironmentVariable("NAHOOK_TEST_API_KEY");
-        var disabledKey = Environment.GetEnvironmentVariable("NAHOOK_TEST_DISABLED_API_KEY");
-        _endpointId = Environment.GetEnvironmentVariable("NAHOOK_TEST_ENDPOINT_ID");
-        _eventType = Environment.GetEnvironmentVariable("NAHOOK_TEST_EVENT_TYPE");
+        var apiUrl = System.Environment.GetEnvironmentVariable("NAHOOK_TEST_API_URL");
+        var apiKey = System.Environment.GetEnvironmentVariable("NAHOOK_TEST_API_KEY");
+        var disabledKey = System.Environment.GetEnvironmentVariable("NAHOOK_TEST_DISABLED_API_KEY");
+        _endpointId = System.Environment.GetEnvironmentVariable("NAHOOK_TEST_ENDPOINT_ID");
+        _eventType = System.Environment.GetEnvironmentVariable("NAHOOK_TEST_EVENT_TYPE");
 
         _skip = string.IsNullOrEmpty(apiUrl) || string.IsNullOrEmpty(apiKey);
 
@@ -213,7 +213,7 @@ public sealed class ClientIntegrationTests : IDisposable
     {
         Skip.If(_skip, "Integration env vars not set");
 
-        var apiUrl = Environment.GetEnvironmentVariable("NAHOOK_TEST_API_URL")!;
+        var apiUrl = System.Environment.GetEnvironmentVariable("NAHOOK_TEST_API_URL")!;
         using var badClient = new NahookClient("nhk_us_invalidkey_zzzz0000zzzz0000", new NahookClientOptions { BaseUrl = apiUrl });
 
         var ex = await Assert.ThrowsAsync<NahookApiException>(() =>

@@ -21,9 +21,9 @@ public sealed class ManagementIntegrationTests : IDisposable
 
     static ManagementIntegrationTests()
     {
-        _apiUrl = Environment.GetEnvironmentVariable("NAHOOK_TEST_API_URL");
-        _token = Environment.GetEnvironmentVariable("NAHOOK_TEST_MGMT_TOKEN");
-        _workspaceId = Environment.GetEnvironmentVariable("NAHOOK_TEST_WORKSPACE_ID");
+        _apiUrl = System.Environment.GetEnvironmentVariable("NAHOOK_TEST_API_URL");
+        _token = System.Environment.GetEnvironmentVariable("NAHOOK_TEST_MGMT_TOKEN");
+        _workspaceId = System.Environment.GetEnvironmentVariable("NAHOOK_TEST_WORKSPACE_ID");
 
         _skip = string.IsNullOrEmpty(_apiUrl)
              || string.IsNullOrEmpty(_token)
@@ -261,6 +261,127 @@ public sealed class ManagementIntegrationTests : IDisposable
         {
             // Cleanup supporting resources
             await _client!.Endpoints.DeleteAsync(_workspaceId!, endpoint.Id);
+            await _client!.EventTypes.DeleteAsync(_workspaceId!, eventType.Id);
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // Environments CRUD
+    // ──────────────────────────────────────────────
+
+    [SkippableFact]
+    [Trait("Category", "ManagementIntegration")]
+    public async Task Environments_Crud()
+    {
+        Skip.If(_skip, "Management integration env vars not set");
+
+        var uid = Uid();
+
+        // Create first environment
+        var created = await _client!.Environments.CreateAsync(_workspaceId!, new CreateEnvironmentOptions
+        {
+            Name = $"Test Env {uid}",
+            Slug = $"test-env-{uid}"
+        });
+
+        Assert.False(string.IsNullOrEmpty(created.Id));
+        Assert.Equal($"Test Env {uid}", created.Name);
+        Assert.Equal($"test-env-{uid}", created.Slug);
+
+        // Create second environment for list assertion
+        var second = await _client!.Environments.CreateAsync(_workspaceId!, new CreateEnvironmentOptions
+        {
+            Name = $"Test Env 2 {uid}",
+            Slug = $"test-env-2-{uid}"
+        });
+
+        try
+        {
+            // List (should contain at least 2: the ones we created + possibly default)
+            var list = await _client!.Environments.ListAsync(_workspaceId!);
+            Assert.True(list.Data.Count >= 2);
+            Assert.Contains(list.Data, e => e.Id == created.Id);
+            Assert.Contains(list.Data, e => e.Id == second.Id);
+
+            // Get
+            var fetched = await _client!.Environments.GetAsync(_workspaceId!, created.Id);
+            Assert.Equal(created.Id, fetched.Id);
+            Assert.Equal($"Test Env {uid}", fetched.Name);
+            Assert.Equal($"test-env-{uid}", fetched.Slug);
+
+            // Update
+            var updatedName = $"Updated Env {uid}";
+            var updated = await _client!.Environments.UpdateAsync(_workspaceId!, created.Id, new UpdateEnvironmentOptions
+            {
+                Name = updatedName
+            });
+            Assert.Equal(updatedName, updated.Name);
+        }
+        finally
+        {
+            // Delete (cleanup)
+            await _client!.Environments.DeleteAsync(_workspaceId!, created.Id);
+            await _client!.Environments.DeleteAsync(_workspaceId!, second.Id);
+        }
+
+        // Verify deletion
+        var ex = await Assert.ThrowsAsync<NahookApiException>(() =>
+            _client!.Environments.GetAsync(_workspaceId!, created.Id));
+        Assert.Equal(404, ex.Status);
+    }
+
+    // ──────────────────────────────────────────────
+    // EventType Visibility Lifecycle
+    // ──────────────────────────────────────────────
+
+    [SkippableFact]
+    [Trait("Category", "ManagementIntegration")]
+    public async Task EventTypeVisibility_Lifecycle()
+    {
+        Skip.If(_skip, "Management integration env vars not set");
+
+        var uid = Uid();
+
+        // Create supporting resources: environment + event type
+        var env = await _client!.Environments.CreateAsync(_workspaceId!, new CreateEnvironmentOptions
+        {
+            Name = $"Vis Env {uid}",
+            Slug = $"vis-env-{uid}"
+        });
+
+        var eventType = await _client!.EventTypes.CreateAsync(_workspaceId!, new CreateEventTypeOptions
+        {
+            Name = $"vis.test.{uid}",
+            Description = $"Visibility test event type {uid}"
+        });
+
+        try
+        {
+            // List visibility for the environment
+            var list = await _client!.Environments.ListEventTypeVisibilityAsync(_workspaceId!, env.Id);
+            Assert.NotNull(list.Data);
+
+            // Set published = true
+            var visibility = await _client!.Environments.SetEventTypeVisibilityAsync(
+                _workspaceId!, env.Id, eventType.Id, new SetVisibilityOptions { Published = true });
+
+            Assert.Equal(eventType.Id, visibility.EventTypeId);
+            Assert.True(visibility.Published);
+
+            // Verify in list
+            var afterPublish = await _client!.Environments.ListEventTypeVisibilityAsync(_workspaceId!, env.Id);
+            Assert.Contains(afterPublish.Data, v => v.EventTypeId == eventType.Id && v.Published);
+
+            // Set published = false
+            var unpublished = await _client!.Environments.SetEventTypeVisibilityAsync(
+                _workspaceId!, env.Id, eventType.Id, new SetVisibilityOptions { Published = false });
+
+            Assert.False(unpublished.Published);
+        }
+        finally
+        {
+            // Cleanup
+            await _client!.Environments.DeleteAsync(_workspaceId!, env.Id);
             await _client!.EventTypes.DeleteAsync(_workspaceId!, eventType.Id);
         }
     }

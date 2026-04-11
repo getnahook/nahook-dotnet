@@ -188,6 +188,63 @@ public sealed class SubscriptionsResource
 }
 
 /// <summary>
+/// Manages environments within a workspace.
+/// </summary>
+public sealed class EnvironmentsResource
+{
+    private readonly NahookHttpClient _http;
+    internal EnvironmentsResource(NahookHttpClient http) => _http = http;
+
+    public async Task<ListResult<Environment>> ListAsync(string workspaceId, CancellationToken ct = default)
+    {
+        string path = $"/management/v1/workspaces/{Uri.EscapeDataString(workspaceId)}/environments";
+        var data = await _http.RequestAsync<List<Environment>>(HttpMethod.Get, path, ct: ct).ConfigureAwait(false);
+        return new ListResult<Environment> { Data = data ?? new List<Environment>() };
+    }
+
+    public async Task<Environment> CreateAsync(string workspaceId, CreateEnvironmentOptions options, CancellationToken ct = default)
+    {
+        string path = $"/management/v1/workspaces/{Uri.EscapeDataString(workspaceId)}/environments";
+        var result = await _http.RequestAsync<Environment>(HttpMethod.Post, path, options, ct: ct).ConfigureAwait(false);
+        return result!;
+    }
+
+    public async Task<Environment> GetAsync(string workspaceId, string id, CancellationToken ct = default)
+    {
+        string path = $"/management/v1/workspaces/{Uri.EscapeDataString(workspaceId)}/environments/{Uri.EscapeDataString(id)}";
+        var result = await _http.RequestAsync<Environment>(HttpMethod.Get, path, ct: ct).ConfigureAwait(false);
+        return result!;
+    }
+
+    public async Task<Environment> UpdateAsync(string workspaceId, string id, UpdateEnvironmentOptions options, CancellationToken ct = default)
+    {
+        string path = $"/management/v1/workspaces/{Uri.EscapeDataString(workspaceId)}/environments/{Uri.EscapeDataString(id)}";
+        var result = await _http.RequestAsync<Environment>(HttpMethod.Patch, path, options, ct: ct).ConfigureAwait(false);
+        return result!;
+    }
+
+    public async Task DeleteAsync(string workspaceId, string id, CancellationToken ct = default)
+    {
+        string path = $"/management/v1/workspaces/{Uri.EscapeDataString(workspaceId)}/environments/{Uri.EscapeDataString(id)}";
+        await _http.RequestAsync(HttpMethod.Delete, path, ct: ct).ConfigureAwait(false);
+    }
+
+    public async Task<ListResult<EventTypeVisibility>> ListEventTypeVisibilityAsync(string workspaceId, string envId, CancellationToken ct = default)
+    {
+        string path = $"/management/v1/workspaces/{Uri.EscapeDataString(workspaceId)}/environments/{Uri.EscapeDataString(envId)}/event-types";
+        var data = await _http.RequestAsync<List<EventTypeVisibility>>(HttpMethod.Get, path, ct: ct).ConfigureAwait(false);
+        return new ListResult<EventTypeVisibility> { Data = data ?? new List<EventTypeVisibility>() };
+    }
+
+    public async Task<EventTypeVisibility> SetEventTypeVisibilityAsync(string workspaceId, string envId, string eventTypeId, SetVisibilityOptions options, CancellationToken ct = default)
+    {
+        string path = $"/management/v1/workspaces/{Uri.EscapeDataString(workspaceId)}/environments/{Uri.EscapeDataString(envId)}/event-types/{Uri.EscapeDataString(eventTypeId)}/visibility";
+        var result = await _http.RequestAsync<EventTypeVisibility>(HttpMethod.Put, path, options, ct: ct).ConfigureAwait(false);
+        return result!;
+    }
+}
+
+/// <summary>
 /// Creates portal sessions for applications within a workspace.
 /// </summary>
 public sealed class PortalSessionsResource
