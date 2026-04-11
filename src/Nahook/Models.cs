@@ -265,11 +265,11 @@ public sealed class Subscription
     [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
 
-    [JsonPropertyName("endpointId")]
-    public string EndpointId { get; set; } = string.Empty;
-
     [JsonPropertyName("eventTypeId")]
     public string EventTypeId { get; set; } = string.Empty;
+
+    [JsonPropertyName("eventTypeName")]
+    public string? EventTypeName { get; set; }
 
     [JsonPropertyName("createdAt")]
     public string CreatedAt { get; set; } = string.Empty;
@@ -277,8 +277,14 @@ public sealed class Subscription
 
 public sealed class CreateSubscriptionOptions
 {
-    [JsonPropertyName("eventTypeId")]
-    public string EventTypeId { get; set; } = string.Empty;
+    [JsonPropertyName("eventTypeIds")]
+    public List<string> EventTypeIds { get; set; } = new();
+}
+
+public sealed class CreateSubscriptionResult
+{
+    [JsonPropertyName("subscribed")]
+    public int Subscribed { get; set; }
 }
 
 public sealed class PortalSession
