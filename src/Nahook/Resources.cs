@@ -173,10 +173,10 @@ public sealed class SubscriptionsResource
         return new ListResult<Subscription> { Data = data ?? new List<Subscription>() };
     }
 
-    public async Task<Subscription> CreateAsync(string workspaceId, string endpointId, CreateSubscriptionOptions options, CancellationToken ct = default)
+    public async Task<CreateSubscriptionResult> CreateAsync(string workspaceId, string endpointId, CreateSubscriptionOptions options, CancellationToken ct = default)
     {
         string path = $"/management/v1/workspaces/{Uri.EscapeDataString(workspaceId)}/endpoints/{Uri.EscapeDataString(endpointId)}/subscriptions";
-        var result = await _http.RequestAsync<Subscription>(HttpMethod.Post, path, options, ct: ct).ConfigureAwait(false);
+        var result = await _http.RequestAsync<CreateSubscriptionResult>(HttpMethod.Post, path, options, ct: ct).ConfigureAwait(false);
         return result!;
     }
 
