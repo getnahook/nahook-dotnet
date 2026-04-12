@@ -41,11 +41,25 @@ var client = new NahookClient("nhk_us_...");
 // With options:
 var client = new NahookClient("nhk_us_...", new NahookClientOptions
 {
-    BaseUrl = "https://api.nahook.com",  // default
     TimeoutMs = 10_000,                  // default: 30_000ms
     Retries = 3,                         // default: 0 (no retries)
 });
 ```
+
+### Configuration
+
+The SDK automatically routes requests to the correct regional API based on your API key prefix (`nhk_us_...` -> US, `nhk_eu_...` -> EU, `nhk_ap_...` -> Asia Pacific). No configuration needed.
+
+To override the base URL (for testing or local development):
+
+```csharp
+var client = new NahookClient("nhk_us_...", new NahookClientOptions
+{
+    BaseUrl = "http://localhost:3001",
+});
+```
+
+For unit tests, mock the SDK client at the dependency injection boundary. For integration tests, override the base URL to point at a local server.
 
 ### Send to a specific endpoint
 
@@ -130,9 +144,12 @@ Programmatically manage your Nahook workspace resources. Implements `IDisposable
 ```csharp
 using Nahook;
 
+// Simple
+var mgmt = new NahookManagement("nhm_...");
+
+// With options
 var mgmt = new NahookManagement("nhm_...", new NahookManagementOptions
 {
-    BaseUrl = "https://api.nahook.com",  // default
     TimeoutMs = 30_000,                  // default
 });
 ```
