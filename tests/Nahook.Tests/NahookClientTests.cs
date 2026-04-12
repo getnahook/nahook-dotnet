@@ -226,6 +226,7 @@ public sealed class NahookManagementConstructorTests
         Assert.NotNull(management.Applications);
         Assert.NotNull(management.Subscriptions);
         Assert.NotNull(management.PortalSessions);
+        Assert.NotNull(management.Environments);
     }
 
     [Fact]
@@ -319,54 +320,242 @@ public sealed class ErrorTypeTests
 }
 
 // ──────────────────────────────────────────────
-// Management Resource Tests
+// Management Endpoints Tests
 // ──────────────────────────────────────────────
 
-public sealed class ManagementResourceTests
+public sealed class NahookManagementEndpointsTests
 {
+    private const string Token = "nhm_test123";
+    private const string BaseUrl = "https://test.nahook.com";
+
     [Fact]
-    public async Task Endpoints_ListAsync_calls_correct_url()
+    public async Task ListAsync_calls_correct_url()
     {
         using var handler = new TestHttpMessageHandler
         {
             ResponseStatusCode = HttpStatusCode.OK,
             ResponseBody = JsonSerializer.Serialize(new[] { new { id = "ep_1", url = "https://example.com", isActive = true, type = "http", createdAt = "2024-01-01", updatedAt = "2024-01-01" } })
         };
-        using var mgmt = new NahookManagement("nhm_test_abc", handler, new NahookManagementOptions { BaseUrl = "https://test.nahook.com" });
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
 
         var result = await mgmt.Endpoints.ListAsync("ws_123");
 
-        Assert.Equal("https://test.nahook.com/management/v1/workspaces/ws_123/endpoints", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/endpoints", handler.LastRequest!.RequestUri!.ToString());
         Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
         Assert.Single(result.Data);
+        Assert.Equal("ep_1", result.Data[0].Id);
     }
 
     [Fact]
-    public async Task Endpoints_CreateAsync_sends_body()
+    public async Task CreateAsync_sends_body_and_returns_endpoint()
     {
         using var handler = new TestHttpMessageHandler
         {
             ResponseStatusCode = HttpStatusCode.Created,
             ResponseBody = JsonSerializer.Serialize(new { id = "ep_1", url = "https://example.com", isActive = true, type = "http", createdAt = "2024-01-01", updatedAt = "2024-01-01" })
         };
-        using var mgmt = new NahookManagement("nhm_test_abc", handler);
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
 
         var result = await mgmt.Endpoints.CreateAsync("ws_123", new CreateEndpointOptions { Url = "https://example.com" });
 
-        Assert.Equal(HttpMethod.Post, handler.LastRequest!.Method);
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/endpoints", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Post, handler.LastRequest.Method);
         Assert.Contains("https://example.com", handler.LastRequestBody!);
         Assert.Equal("ep_1", result.Id);
+        Assert.Equal("https://example.com", result.Url);
     }
 
     [Fact]
-    public async Task Applications_ListAsync_passes_query_params()
+    public async Task GetAsync_calls_correct_url()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "ep_1", url = "https://example.com", isActive = true, type = "http", createdAt = "2024-01-01", updatedAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Endpoints.GetAsync("ws_123", "ep_1");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/endpoints/ep_1", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Equal("ep_1", result.Id);
+        Assert.True(result.IsActive);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_sends_patch_with_body()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "ep_1", url = "https://updated.com", isActive = false, type = "http", createdAt = "2024-01-01", updatedAt = "2024-01-02" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Endpoints.UpdateAsync("ws_123", "ep_1", new UpdateEndpointOptions { Url = "https://updated.com", IsActive = false });
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/endpoints/ep_1", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Patch, handler.LastRequest.Method);
+        Assert.Contains("https://updated.com", handler.LastRequestBody!);
+        Assert.Equal("https://updated.com", result.Url);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_uses_correct_method_and_path()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.NoContent,
+            ResponseBody = ""
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        await mgmt.Endpoints.DeleteAsync("ws_123", "ep_1");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/endpoints/ep_1", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Delete, handler.LastRequest.Method);
+    }
+}
+
+// ──────────────────────────────────────────────
+// Management Event Types Tests
+// ──────────────────────────────────────────────
+
+public sealed class NahookManagementEventTypesTests
+{
+    private const string Token = "nhm_test123";
+    private const string BaseUrl = "https://test.nahook.com";
+
+    [Fact]
+    public async Task ListAsync_calls_correct_url()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new[] { new { id = "evt_1", name = "order.created", description = "Order created", createdAt = "2024-01-01" } })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.EventTypes.ListAsync("ws_123");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/event-types", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Single(result.Data);
+        Assert.Equal("evt_1", result.Data[0].Id);
+        Assert.Equal("order.created", result.Data[0].Name);
+    }
+
+    [Fact]
+    public async Task CreateAsync_sends_body_and_returns_event_type()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.Created,
+            ResponseBody = JsonSerializer.Serialize(new { id = "evt_2", name = "user.created", description = "User created", createdAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.EventTypes.CreateAsync("ws_123", new CreateEventTypeOptions { Name = "user.created", Description = "User created" });
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/event-types", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Post, handler.LastRequest.Method);
+        Assert.Contains("user.created", handler.LastRequestBody!);
+        Assert.Contains("User created", handler.LastRequestBody!);
+        Assert.Equal("evt_2", result.Id);
+        Assert.Equal("user.created", result.Name);
+    }
+
+    [Fact]
+    public async Task GetAsync_calls_correct_url()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "evt_1", name = "order.created", description = "Order created", createdAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.EventTypes.GetAsync("ws_123", "evt_1");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/event-types/evt_1", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Equal("evt_1", result.Id);
+        Assert.Equal("order.created", result.Name);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_sends_patch_with_body()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "evt_1", name = "order.created", description = "Updated description", createdAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.EventTypes.UpdateAsync("ws_123", "evt_1", new UpdateEventTypeOptions { Description = "Updated description" });
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/event-types/evt_1", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Patch, handler.LastRequest.Method);
+        Assert.Contains("Updated description", handler.LastRequestBody!);
+        Assert.Equal("Updated description", result.Description);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_uses_correct_method_and_path()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.NoContent,
+            ResponseBody = ""
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        await mgmt.EventTypes.DeleteAsync("ws_123", "evt_1");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/event-types/evt_1", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Delete, handler.LastRequest.Method);
+    }
+}
+
+// ──────────────────────────────────────────────
+// Management Applications Tests
+// ──────────────────────────────────────────────
+
+public sealed class NahookManagementApplicationsTests
+{
+    private const string Token = "nhm_test123";
+    private const string BaseUrl = "https://test.nahook.com";
+
+    [Fact]
+    public async Task ListAsync_calls_correct_url()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new[] { new { id = "app_1", name = "My App", metadata = new Dictionary<string, string>(), createdAt = "2024-01-01", updatedAt = "2024-01-01" } })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Applications.ListAsync("ws_123");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/applications", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Single(result.Data);
+        Assert.Equal("app_1", result.Data[0].Id);
+        Assert.Equal("My App", result.Data[0].Name);
+    }
+
+    [Fact]
+    public async Task ListAsync_passes_pagination_query_params()
     {
         using var handler = new TestHttpMessageHandler
         {
             ResponseStatusCode = HttpStatusCode.OK,
             ResponseBody = JsonSerializer.Serialize(Array.Empty<object>())
         };
-        using var mgmt = new NahookManagement("nhm_test_abc", handler, new NahookManagementOptions { BaseUrl = "https://test.nahook.com" });
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
 
         await mgmt.Applications.ListAsync("ws_123", new ListOptions { Limit = 10, Offset = 5 });
 
@@ -376,41 +565,368 @@ public sealed class ManagementResourceTests
     }
 
     [Fact]
-    public async Task Subscriptions_DeleteAsync_uses_correct_path()
+    public async Task CreateAsync_sends_body_and_returns_application()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.Created,
+            ResponseBody = JsonSerializer.Serialize(new { id = "app_2", name = "New App", externalId = "ext_1", metadata = new Dictionary<string, string>(), createdAt = "2024-01-01", updatedAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Applications.CreateAsync("ws_123", new CreateApplicationOptions { Name = "New App", ExternalId = "ext_1" });
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/applications", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Post, handler.LastRequest.Method);
+        Assert.Contains("New App", handler.LastRequestBody!);
+        Assert.Contains("ext_1", handler.LastRequestBody!);
+        Assert.Equal("app_2", result.Id);
+        Assert.Equal("New App", result.Name);
+    }
+
+    [Fact]
+    public async Task GetAsync_calls_correct_url()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "app_1", name = "My App", metadata = new Dictionary<string, string>(), createdAt = "2024-01-01", updatedAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Applications.GetAsync("ws_123", "app_1");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/applications/app_1", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Equal("app_1", result.Id);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_sends_patch_with_body()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "app_1", name = "Updated App", metadata = new Dictionary<string, string>(), createdAt = "2024-01-01", updatedAt = "2024-01-02" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Applications.UpdateAsync("ws_123", "app_1", new UpdateApplicationOptions { Name = "Updated App" });
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/applications/app_1", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Patch, handler.LastRequest.Method);
+        Assert.Contains("Updated App", handler.LastRequestBody!);
+        Assert.Equal("Updated App", result.Name);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_uses_correct_method_and_path()
     {
         using var handler = new TestHttpMessageHandler
         {
             ResponseStatusCode = HttpStatusCode.NoContent,
             ResponseBody = ""
         };
-        using var mgmt = new NahookManagement("nhm_test_abc", handler, new NahookManagementOptions { BaseUrl = "https://test.nahook.com" });
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
 
-        await mgmt.Subscriptions.DeleteAsync("ws_123", "ep_abc", "evt_xyz");
+        await mgmt.Applications.DeleteAsync("ws_123", "app_1");
 
-        Assert.Equal(
-            "https://test.nahook.com/management/v1/workspaces/ws_123/endpoints/ep_abc/subscriptions/evt_xyz",
-            handler.LastRequest!.RequestUri!.ToString()
-        );
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/applications/app_1", handler.LastRequest!.RequestUri!.ToString());
         Assert.Equal(HttpMethod.Delete, handler.LastRequest.Method);
     }
 
     [Fact]
-    public async Task PortalSessions_CreateAsync_uses_correct_path()
+    public async Task ListEndpointsAsync_calls_correct_url()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new[] { new { id = "ep_1", url = "https://example.com", isActive = true, type = "http", createdAt = "2024-01-01", updatedAt = "2024-01-01" } })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Applications.ListEndpointsAsync("ws_123", "app_1");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/applications/app_1/endpoints", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Single(result.Data);
+        Assert.Equal("ep_1", result.Data[0].Id);
+    }
+
+    [Fact]
+    public async Task CreateEndpointAsync_sends_body_and_returns_endpoint()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.Created,
+            ResponseBody = JsonSerializer.Serialize(new { id = "ep_2", url = "https://new.example.com", isActive = true, type = "http", createdAt = "2024-01-01", updatedAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Applications.CreateEndpointAsync("ws_123", "app_1", new CreateEndpointOptions { Url = "https://new.example.com" });
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/applications/app_1/endpoints", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Post, handler.LastRequest.Method);
+        Assert.Contains("https://new.example.com", handler.LastRequestBody!);
+        Assert.Equal("ep_2", result.Id);
+        Assert.Equal("https://new.example.com", result.Url);
+    }
+}
+
+// ──────────────────────────────────────────────
+// Management Subscriptions Tests
+// ──────────────────────────────────────────────
+
+public sealed class NahookManagementSubscriptionsTests
+{
+    private const string Token = "nhm_test123";
+    private const string BaseUrl = "https://test.nahook.com";
+
+    [Fact]
+    public async Task ListAsync_calls_correct_url()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new[] { new { id = "sub_1", eventTypeId = "evt_1", eventTypeName = "order.created", createdAt = "2024-01-01" } })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Subscriptions.ListAsync("ws_123", "ep_abc");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/endpoints/ep_abc/subscriptions", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Single(result.Data);
+        Assert.Equal("sub_1", result.Data[0].Id);
+        Assert.Equal("evt_1", result.Data[0].EventTypeId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_sends_body_and_returns_result()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.Created,
+            ResponseBody = JsonSerializer.Serialize(new { subscribed = 2 })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Subscriptions.CreateAsync("ws_123", "ep_abc", new CreateSubscriptionOptions
+        {
+            EventTypeIds = new List<string> { "evt_1", "evt_2" }
+        });
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/endpoints/ep_abc/subscriptions", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Post, handler.LastRequest.Method);
+        Assert.Contains("evt_1", handler.LastRequestBody!);
+        Assert.Contains("evt_2", handler.LastRequestBody!);
+        Assert.Equal(2, result.Subscribed);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_uses_correct_method_and_path()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.NoContent,
+            ResponseBody = ""
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        await mgmt.Subscriptions.DeleteAsync("ws_123", "ep_abc", "evt_xyz");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/endpoints/ep_abc/subscriptions/evt_xyz", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Delete, handler.LastRequest.Method);
+    }
+}
+
+// ──────────────────────────────────────────────
+// Management Portal Sessions Tests
+// ──────────────────────────────────────────────
+
+public sealed class NahookManagementPortalSessionsTests
+{
+    private const string Token = "nhm_test123";
+    private const string BaseUrl = "https://test.nahook.com";
+
+    [Fact]
+    public async Task CreateAsync_calls_correct_url_and_returns_session()
     {
         using var handler = new TestHttpMessageHandler
         {
             ResponseStatusCode = HttpStatusCode.OK,
             ResponseBody = JsonSerializer.Serialize(new { url = "https://portal.nahook.com/s/abc", code = "abc123", expiresAt = "2024-12-31" })
         };
-        using var mgmt = new NahookManagement("nhm_test_abc", handler, new NahookManagementOptions { BaseUrl = "https://test.nahook.com" });
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
 
         var result = await mgmt.PortalSessions.CreateAsync("ws_123", "app_456");
 
-        Assert.Equal(
-            "https://test.nahook.com/management/v1/workspaces/ws_123/applications/app_456/portal",
-            handler.LastRequest!.RequestUri!.ToString()
-        );
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/applications/app_456/portal", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Post, handler.LastRequest.Method);
+        Assert.Equal("https://portal.nahook.com/s/abc", result.Url);
         Assert.Equal("abc123", result.Code);
+        Assert.Equal("2024-12-31", result.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task CreateAsync_with_metadata_sends_body()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { url = "https://portal.nahook.com/s/def", code = "def456", expiresAt = "2024-12-31" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.PortalSessions.CreateAsync("ws_123", "app_456", new CreatePortalSessionOptions
+        {
+            Metadata = new Dictionary<string, string> { ["tenant"] = "acme" }
+        });
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/applications/app_456/portal", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Post, handler.LastRequest.Method);
+        Assert.Contains("acme", handler.LastRequestBody!);
+        Assert.Equal("def456", result.Code);
+    }
+}
+
+// ──────────────────────────────────────────────
+// Management Environments Tests
+// ──────────────────────────────────────────────
+
+public sealed class NahookManagementEnvironmentsTests
+{
+    private const string Token = "nhm_test123";
+    private const string BaseUrl = "https://test.nahook.com";
+
+    [Fact]
+    public async Task ListAsync_calls_correct_url()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new[] { new { id = "env_1", name = "Production", slug = "production", isDefault = true, createdAt = "2024-01-01", updatedAt = "2024-01-01" } })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Environments.ListAsync("ws_123");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/environments", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Single(result.Data);
+        Assert.Equal("env_1", result.Data[0].Id);
+        Assert.Equal("Production", result.Data[0].Name);
+    }
+
+    [Fact]
+    public async Task CreateAsync_sends_body_and_returns_environment()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.Created,
+            ResponseBody = JsonSerializer.Serialize(new { id = "env_2", name = "Staging", slug = "staging", isDefault = false, createdAt = "2024-01-01", updatedAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Environments.CreateAsync("ws_123", new CreateEnvironmentOptions { Name = "Staging", Slug = "staging" });
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/environments", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Post, handler.LastRequest.Method);
+        Assert.Contains("Staging", handler.LastRequestBody!);
+        Assert.Contains("staging", handler.LastRequestBody!);
+        Assert.Equal("env_2", result.Id);
+        Assert.Equal("Staging", result.Name);
+        Assert.Equal("staging", result.Slug);
+    }
+
+    [Fact]
+    public async Task GetAsync_calls_correct_url()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "env_1", name = "Production", slug = "production", isDefault = true, createdAt = "2024-01-01", updatedAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Environments.GetAsync("ws_123", "env_1");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/environments/env_1", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Equal("env_1", result.Id);
+        Assert.True(result.IsDefault);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_sends_patch_with_body()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "env_1", name = "Prod", slug = "production", isDefault = true, createdAt = "2024-01-01", updatedAt = "2024-01-02" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Environments.UpdateAsync("ws_123", "env_1", new UpdateEnvironmentOptions { Name = "Prod" });
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/environments/env_1", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Patch, handler.LastRequest.Method);
+        Assert.Contains("Prod", handler.LastRequestBody!);
+        Assert.Equal("Prod", result.Name);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_uses_correct_method_and_path()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.NoContent,
+            ResponseBody = ""
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        await mgmt.Environments.DeleteAsync("ws_123", "env_2");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/environments/env_2", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Delete, handler.LastRequest.Method);
+    }
+
+    [Fact]
+    public async Task ListEventTypeVisibilityAsync_calls_correct_url()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new[] { new { eventTypeId = "evt_1", eventTypeName = "order.created", published = true } })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Environments.ListEventTypeVisibilityAsync("ws_123", "env_1");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/environments/env_1/event-types", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Single(result.Data);
+        Assert.Equal("evt_1", result.Data[0].EventTypeId);
+        Assert.True(result.Data[0].Published);
+    }
+
+    [Fact]
+    public async Task SetEventTypeVisibilityAsync_sends_put_with_body()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { eventTypeId = "evt_1", eventTypeName = "order.created", published = false })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Environments.SetEventTypeVisibilityAsync("ws_123", "env_1", "evt_1", new SetVisibilityOptions { Published = false });
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_123/environments/env_1/event-types/evt_1/visibility", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Put, handler.LastRequest.Method);
+        Assert.Contains("published", handler.LastRequestBody!);
+        Assert.Equal("evt_1", result.EventTypeId);
+        Assert.False(result.Published);
     }
 }
 
@@ -421,7 +937,7 @@ public sealed class ManagementResourceTests
 public sealed class HttpHeaderTests
 {
     [Fact]
-    public async Task Sends_authorization_header()
+    public async Task Sends_authorization_bearer_header()
     {
         using var handler = new TestHttpMessageHandler
         {
@@ -437,7 +953,7 @@ public sealed class HttpHeaderTests
     }
 
     [Fact]
-    public async Task Sends_user_agent_header()
+    public async Task Sends_user_agent_starting_with_nahook_dotnet()
     {
         using var handler = new TestHttpMessageHandler
         {
@@ -448,6 +964,36 @@ public sealed class HttpHeaderTests
         await client.SendAsync("ep_1", new SendOptions { Payload = new Dictionary<string, object>() });
 
         Assert.Contains(handler.LastRequest!.Headers.UserAgent, p => p.Product != null && p.Product.Name == "nahook-dotnet");
+    }
+
+    [Fact]
+    public async Task Post_request_includes_content_type_json()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseBody = JsonSerializer.Serialize(new { deliveryId = "del_1", idempotencyKey = "k", status = "accepted" })
+        };
+        using var client = new NahookClient("nhk_test_secret", handler);
+
+        await client.SendAsync("ep_1", new SendOptions { Payload = new Dictionary<string, object>() });
+
+        Assert.NotNull(handler.LastRequest!.Content);
+        Assert.Equal("application/json", handler.LastRequest.Content!.Headers.ContentType!.MediaType);
+    }
+
+    [Fact]
+    public async Task Get_request_has_no_content_type()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new[] { new { id = "ep_1", url = "https://example.com", isActive = true, type = "http", createdAt = "2024-01-01", updatedAt = "2024-01-01" } })
+        };
+        using var mgmt = new NahookManagement("nhm_test_secret", handler);
+
+        await mgmt.Endpoints.ListAsync("ws_123");
+
+        Assert.Null(handler.LastRequest!.Content);
     }
 }
 
