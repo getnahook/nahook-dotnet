@@ -142,7 +142,7 @@ var mgmt = new NahookManagement("nhm_...", new NahookManagementOptions
 ```csharp
 var endpoints = await mgmt.Endpoints.ListAsync("ws_abc");
 
-var endpoint = await mgmt.Endpoints.CreateAsync("ws_abc", new CreateEndpointRequest
+var endpoint = await mgmt.Endpoints.CreateAsync("ws_abc", new CreateEndpointOptions
 {
     Url = "https://example.com/webhooks",
     Description = "Production webhook",
@@ -151,7 +151,7 @@ var endpoint = await mgmt.Endpoints.CreateAsync("ws_abc", new CreateEndpointRequ
 
 var endpoint = await mgmt.Endpoints.GetAsync("ws_abc", "ep_123");
 
-await mgmt.Endpoints.UpdateAsync("ws_abc", "ep_123", new UpdateEndpointRequest
+await mgmt.Endpoints.UpdateAsync("ws_abc", "ep_123", new UpdateEndpointOptions
 {
     Description = "Updated",
     IsActive = false,
@@ -165,7 +165,7 @@ await mgmt.Endpoints.DeleteAsync("ws_abc", "ep_123");
 ```csharp
 var eventTypes = await mgmt.EventTypes.ListAsync("ws_abc");
 
-var eventType = await mgmt.EventTypes.CreateAsync("ws_abc", new CreateEventTypeRequest
+var eventType = await mgmt.EventTypes.CreateAsync("ws_abc", new CreateEventTypeOptions
 {
     Name = "order.paid",
     Description = "Fired when an order is paid",
@@ -173,7 +173,7 @@ var eventType = await mgmt.EventTypes.CreateAsync("ws_abc", new CreateEventTypeR
 
 var eventType = await mgmt.EventTypes.GetAsync("ws_abc", "evt_123");
 
-await mgmt.EventTypes.UpdateAsync("ws_abc", "evt_123", new UpdateEventTypeRequest
+await mgmt.EventTypes.UpdateAsync("ws_abc", "evt_123", new UpdateEventTypeOptions
 {
     Description = "Updated description",
 });
@@ -186,7 +186,7 @@ await mgmt.EventTypes.DeleteAsync("ws_abc", "evt_123");
 ```csharp
 var apps = await mgmt.Applications.ListAsync("ws_abc");
 
-var app = await mgmt.Applications.CreateAsync("ws_abc", new CreateApplicationRequest
+var app = await mgmt.Applications.CreateAsync("ws_abc", new CreateApplicationOptions
 {
     Name = "Acme Corp",
     ExternalId = "acme-123",
@@ -194,7 +194,7 @@ var app = await mgmt.Applications.CreateAsync("ws_abc", new CreateApplicationReq
 
 var app = await mgmt.Applications.GetAsync("ws_abc", "app_123");
 
-await mgmt.Applications.UpdateAsync("ws_abc", "app_123", new UpdateApplicationRequest
+await mgmt.Applications.UpdateAsync("ws_abc", "app_123", new UpdateApplicationOptions
 {
     Name = "Acme Inc",
 });
@@ -204,7 +204,7 @@ await mgmt.Applications.DeleteAsync("ws_abc", "app_123");
 // Endpoints scoped to an application
 var endpoints = await mgmt.Applications.ListEndpointsAsync("ws_abc", "app_123");
 
-var ep = await mgmt.Applications.CreateEndpointAsync("ws_abc", "app_123", new CreateEndpointRequest
+var ep = await mgmt.Applications.CreateEndpointAsync("ws_abc", "app_123", new CreateEndpointOptions
 {
     Url = "https://acme.com/webhooks",
 });
@@ -215,7 +215,7 @@ var ep = await mgmt.Applications.CreateEndpointAsync("ws_abc", "app_123", new Cr
 ```csharp
 var subs = await mgmt.Subscriptions.ListAsync("ws_abc", "ep_123");
 
-await mgmt.Subscriptions.CreateAsync("ws_abc", "ep_123", new CreateSubscriptionRequest
+await mgmt.Subscriptions.CreateAsync("ws_abc", "ep_123", new CreateSubscriptionOptions
 {
     EventTypeIds = new[] { "evt_456" },
 });
@@ -228,7 +228,7 @@ await mgmt.Subscriptions.DeleteAsync("ws_abc", "ep_123", "evt_456");
 ```csharp
 var envs = await mgmt.Environments.ListAsync("ws_abc");
 
-var env = await mgmt.Environments.CreateAsync("ws_abc", new CreateEnvironmentRequest
+var env = await mgmt.Environments.CreateAsync("ws_abc", new CreateEnvironmentOptions
 {
     Name = "Staging",
     Slug = "staging",
@@ -236,7 +236,7 @@ var env = await mgmt.Environments.CreateAsync("ws_abc", new CreateEnvironmentReq
 
 var env = await mgmt.Environments.GetAsync("ws_abc", "env_123");
 
-await mgmt.Environments.UpdateAsync("ws_abc", "env_123", new UpdateEnvironmentRequest
+await mgmt.Environments.UpdateAsync("ws_abc", "env_123", new UpdateEnvironmentOptions
 {
     Name = "Pre-production",
 });
@@ -256,7 +256,7 @@ Control which event types are visible per environment.
 ```csharp
 var visibility = await mgmt.Environments.ListEventTypeVisibilityAsync("ws_abc", "env_123");
 
-var vis = await mgmt.Environments.SetEventTypeVisibilityAsync("ws_abc", "env_123", "evt_456", new SetVisibilityRequest
+var vis = await mgmt.Environments.SetEventTypeVisibilityAsync("ws_abc", "env_123", "evt_456", new SetVisibilityOptions
 {
     Published = true,
 });
@@ -268,7 +268,7 @@ var vis = await mgmt.Environments.SetEventTypeVisibilityAsync("ws_abc", "env_123
 ### Portal Sessions
 
 ```csharp
-var session = await mgmt.PortalSessions.CreateAsync("ws_abc", "app_123", new CreatePortalSessionRequest
+var session = await mgmt.PortalSessions.CreateAsync("ws_abc", "app_123", new CreatePortalSessionOptions
 {
     Metadata = new Dictionary<string, string> { { "userId", "user-456" } },
 });
