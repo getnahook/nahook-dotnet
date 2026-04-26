@@ -1,0 +1,19 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+[*.cs]
+# Keep braces of a block inside a `case` label aligned with the case keyword
+# (Allman-style for switch arms). Without this, `dotnet format` rewrites
+# every case-block `{` to be indented one level deeper, conflicting with
+# the project's intentional style.
+csharp_indent_case_contents_when_block = false
+
+[*.{json,yml,yaml,md}]
+indent_size = 2
