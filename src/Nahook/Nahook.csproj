@@ -18,7 +18,7 @@
     <PackageTags>webhooks;notifications;nahook;sdk</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://nahook.com</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/nahook/nahook-dotnet</RepositoryUrl>
+    <RepositoryUrl>https://github.com/getnahook/nahook-dotnet</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
