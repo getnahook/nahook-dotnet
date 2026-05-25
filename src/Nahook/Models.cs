@@ -310,6 +310,12 @@ public sealed class CreatePortalSessionOptions
 {
     [JsonPropertyName("metadata")]
     public Dictionary<string, string>? Metadata { get; set; }
+
+    [JsonPropertyName("role")]
+    public string? Role { get; set; }
+
+    [JsonPropertyName("expiresInMinutes")]
+    public int? ExpiresInMinutes { get; set; }
 }
 
 public sealed class Environment
