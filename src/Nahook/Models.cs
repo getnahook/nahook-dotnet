@@ -171,6 +171,13 @@ public sealed class CreateEndpointOptions
 
     [JsonPropertyName("authPassword")]
     public string? AuthPassword { get; set; }
+
+    /// <summary>
+    /// Optional. Public id (e.g. <c>env_abc123</c>) of the environment to scope this endpoint.
+    /// If omitted, the workspace's default environment is used.
+    /// </summary>
+    [JsonPropertyName("environmentId")]
+    public string? EnvironmentId { get; set; }
 }
 
 public sealed class UpdateEndpointOptions
