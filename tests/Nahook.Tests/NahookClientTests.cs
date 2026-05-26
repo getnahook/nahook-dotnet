@@ -1032,7 +1032,7 @@ public sealed class RegionalRoutingTests
     }
 
     [Fact]
-    public void BaseUrl_option_overrides_region_resolution()
+    public async Task BaseUrl_option_overrides_region_resolution()
     {
         using var handler = new TestHttpMessageHandler();
         using var client = new NahookClient("nhk_eu_abc123", handler, new NahookClientOptions
@@ -1042,10 +1042,39 @@ public sealed class RegionalRoutingTests
 
         // The client should use the explicit baseUrl, not the eu region URL.
         // We verify by making a request and checking the URL used.
-        var result = client.SendAsync("ep_1", new SendOptions
+        await client.SendAsync("ep_1", new SendOptions
         {
             Payload = new Dictionary<string, object> { ["e"] = "test" }
-        }).GetAwaiter().GetResult();
+        });
+
+        Assert.StartsWith("https://custom.nahook.com/", handler.LastRequest!.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task BaseUrl_option_overrides_region_resolution_for_trigger()
+    {
+        // Parallel to the send() test above — region-prefixed key must NOT
+        // win over an explicit BaseUrl when calling TriggerAsync either.
+        // Catches a regression where the override is wired through SendAsync
+        // but skipped for TriggerAsync (different code path in the client).
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseBody = JsonSerializer.Serialize(new
+            {
+                eventTypeId = "evt_x",
+                deliveryIds = Array.Empty<string>(),
+                status = "accepted"
+            })
+        };
+        using var client = new NahookClient("nhk_eu_abc123", handler, new NahookClientOptions
+        {
+            BaseUrl = "https://custom.nahook.com"
+        });
+
+        await client.TriggerAsync("user.created", new TriggerOptions
+        {
+            Payload = new Dictionary<string, object> { ["e"] = "test" }
+        });
 
         Assert.StartsWith("https://custom.nahook.com/", handler.LastRequest!.RequestUri!.ToString());
     }
