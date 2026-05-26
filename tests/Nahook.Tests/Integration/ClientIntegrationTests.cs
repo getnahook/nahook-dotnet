@@ -131,7 +131,10 @@ public sealed class ClientIntegrationTests : IDisposable
     {
         Skip.If(_skip, "Integration env vars not set");
 
-        var result = await _client!.TriggerAsync("nonexistent.unsubscribed.event", new TriggerOptions
+        // Pre-seeded fixture event type with zero subscriptions — shared across
+        // all SDK integration tests. See packages/db/src/seeds/test-fixtures.sql
+        // section 8b.
+        var result = await _client!.TriggerAsync("event.type.nobody.subscribed.to", new TriggerOptions
         {
             Payload = new Dictionary<string, object> { ["ghost"] = true }
         });
