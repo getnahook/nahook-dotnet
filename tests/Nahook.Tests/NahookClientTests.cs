@@ -227,6 +227,7 @@ public sealed class NahookManagementConstructorTests
         Assert.NotNull(management.Subscriptions);
         Assert.NotNull(management.PortalSessions);
         Assert.NotNull(management.Environments);
+        Assert.NotNull(management.Deliveries);
     }
 
     [Fact]
@@ -1114,5 +1115,189 @@ public sealed class RetryDelayTests
     {
         int delay = NahookHttpClient.ComputeDelay(0, 3);
         Assert.Equal(3000, delay);
+    }
+}
+
+// ──────────────────────────────────────────────
+// Management Deliveries Tests
+// ──────────────────────────────────────────────
+
+public sealed class NahookManagementDeliveriesTests
+{
+    private const string Token = "nhm_test123";
+    private const string BaseUrl = "https://test.nahook.com";
+
+    private static string DeliveryJson(string id, string status, bool hasPayload, int totalAttempts) =>
+        JsonSerializer.Serialize(new
+        {
+            id,
+            idempotencyKey = "k-" + id,
+            endpointId = "ep_1",
+            status,
+            totalAttempts,
+            firstAttemptAt = "2026-05-28T14:30:59Z",
+            deliveredAt = status == "delivered" ? "2026-05-28T14:30:59Z" : null,
+            nextRetryAt = (string?)null,
+            hasPayload,
+            createdAt = "2026-05-28T14:30:59Z",
+            updatedAt = "2026-05-28T14:30:59Z"
+        });
+
+    [Fact]
+    public async Task ListAsync_returns_paginated_data_and_next_cursor()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = "{\"deliveries\":[" + DeliveryJson("del_a", "delivered", true, 1) + "," + DeliveryJson("del_b", "failed", false, 3) + "],\"nextCursor\":\"opaque-token-aaa\"}"
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Deliveries.ListAsync("ws_abc", "ep_1");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_abc/endpoints/ep_1/deliveries", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Equal(2, result.Data.Count);
+        Assert.Equal("del_a", result.Data[0].Id);
+        Assert.Equal("opaque-token-aaa", result.NextCursor);
+    }
+
+    [Fact]
+    public async Task ListAsync_returns_null_cursor_when_last_page()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = "{\"deliveries\":[],\"nextCursor\":null}"
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Deliveries.ListAsync("ws_abc", "ep_1");
+
+        Assert.Empty(result.Data);
+        Assert.Null(result.NextCursor);
+    }
+
+    [Fact]
+    public async Task ListAsync_forwards_query_params()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = "{\"deliveries\":[],\"nextCursor\":null}"
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        await mgmt.Deliveries.ListAsync("ws_abc", "ep_1", new ListDeliveriesOptions
+        {
+            Limit = 25,
+            Cursor = "opaque-token-xyz",
+            Status = "failed"
+        });
+
+        var uri = handler.LastRequest!.RequestUri!.ToString();
+        Assert.Contains("limit=25", uri);
+        Assert.Contains("cursor=opaque-token-xyz", uri);
+        Assert.Contains("status=failed", uri);
+    }
+
+    [Fact]
+    public async Task ListAsync_omits_unset_query_params()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = "{\"deliveries\":[],\"nextCursor\":null}"
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        await mgmt.Deliveries.ListAsync("ws_abc", "ep_1");
+
+        var uri = handler.LastRequest!.RequestUri!.ToString();
+        Assert.DoesNotContain("?", uri);
+        Assert.DoesNotContain("limit", uri);
+        Assert.DoesNotContain("cursor", uri);
+        Assert.DoesNotContain("status", uri);
+    }
+
+    [Fact]
+    public async Task GetAsync_returns_metadata_without_envelope_by_default()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = DeliveryJson("del_a", "delivered", true, 1)
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var delivery = await mgmt.Deliveries.GetAsync("ws_abc", "del_a");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_abc/deliveries/del_a", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Equal("del_a", delivery.Id);
+        Assert.True(delivery.HasPayload);
+        Assert.Null(delivery.Payload);
+    }
+
+    [Fact]
+    public async Task GetAsync_with_include_payload_returns_envelope()
+    {
+        string body = "{\"id\":\"del_a\",\"idempotencyKey\":\"k1\",\"endpointId\":\"ep_1\",\"status\":\"delivered\",\"totalAttempts\":1,\"firstAttemptAt\":\"2026-05-28T14:30:59Z\",\"deliveredAt\":\"2026-05-28T14:30:59Z\",\"nextRetryAt\":null,\"hasPayload\":true,\"createdAt\":\"2026-05-28T14:30:59Z\",\"updatedAt\":\"2026-05-28T14:30:59Z\",\"payload\":{\"status\":\"available\",\"data\":{\"orderId\":\"ord_123\"},\"contentType\":\"application/json\"}}";
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = body
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var delivery = await mgmt.Deliveries.GetAsync("ws_abc", "del_a", new GetDeliveryOptions { IncludePayload = true });
+
+        var uri = handler.LastRequest!.RequestUri!.ToString();
+        Assert.Contains("include=payload", uri);
+        Assert.NotNull(delivery.Payload);
+        Assert.Equal("available", delivery.Payload!.Status);
+        Assert.Equal("application/json", delivery.Payload!.ContentType);
+        Assert.NotNull(delivery.Payload!.Data);
+        Assert.Equal("ord_123", delivery.Payload!.Data!.Value.GetProperty("orderId").GetString());
+    }
+
+    [Fact]
+    public async Task GetAsync_returns_forbidden_envelope_for_plan_gated_workspace()
+    {
+        string body = "{\"id\":\"del_a\",\"idempotencyKey\":\"k1\",\"endpointId\":\"ep_1\",\"status\":\"delivered\",\"totalAttempts\":1,\"firstAttemptAt\":null,\"deliveredAt\":\"2026-05-28T14:30:59Z\",\"nextRetryAt\":null,\"hasPayload\":true,\"createdAt\":\"2026-05-28T14:30:59Z\",\"updatedAt\":\"2026-05-28T14:30:59Z\",\"payload\":{\"status\":\"forbidden\"}}";
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = body
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var delivery = await mgmt.Deliveries.GetAsync("ws_abc", "del_a", new GetDeliveryOptions { IncludePayload = true });
+
+        Assert.NotNull(delivery.Payload);
+        Assert.Equal("forbidden", delivery.Payload!.Status);
+        Assert.Null(delivery.Payload!.Data);
+        Assert.Null(delivery.Payload!.ContentType);
+    }
+
+    [Fact]
+    public async Task GetAttemptsAsync_returns_array()
+    {
+        string body = "[{\"id\":\"att_1\",\"attemptNumber\":1,\"status\":\"failed\",\"responseStatusCode\":502,\"responseTimeMs\":142,\"errorMessage\":\"Bad gateway\",\"createdAt\":\"2026-05-28T14:31:00Z\"},{\"id\":\"att_2\",\"attemptNumber\":2,\"status\":\"success\",\"responseStatusCode\":200,\"responseTimeMs\":88,\"errorMessage\":null,\"createdAt\":\"2026-05-28T14:31:30Z\"}]";
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = body
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var attempts = await mgmt.Deliveries.GetAttemptsAsync("ws_abc", "del_a");
+
+        Assert.Equal($"{BaseUrl}/management/v1/workspaces/ws_abc/deliveries/del_a/attempts", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Get, handler.LastRequest.Method);
+        Assert.Equal(2, attempts.Count);
+        Assert.Equal(1, attempts[0].AttemptNumber);
+        Assert.Equal("success", attempts[1].Status);
+        Assert.Equal(502, attempts[0].ResponseStatusCode);
     }
 }

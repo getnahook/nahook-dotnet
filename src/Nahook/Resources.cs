@@ -245,6 +245,81 @@ public sealed class EnvironmentsResource
 }
 
 /// <summary>
+/// Read access to a workspace's webhook deliveries. All methods are read-only —
+/// there is no create/update/delete on this resource.
+/// </summary>
+public sealed class DeliveriesResource
+{
+    private readonly NahookHttpClient _http;
+    internal DeliveriesResource(NahookHttpClient http) => _http = http;
+
+    /// <summary>
+    /// List deliveries for an endpoint, newest-first. Returns a page of
+    /// <see cref="Delivery"/> plus an opaque <c>NextCursor</c> to fetch the
+    /// next page (or <c>null</c> when there are no more).
+    /// </summary>
+    public async Task<PaginatedResult<Delivery>> ListAsync(
+        string workspaceId,
+        string endpointId,
+        ListDeliveriesOptions? options = null,
+        CancellationToken ct = default)
+    {
+        string path = $"/management/v1/workspaces/{Uri.EscapeDataString(workspaceId)}/endpoints/{Uri.EscapeDataString(endpointId)}/deliveries";
+        Dictionary<string, string>? query = null;
+
+        if (options != null)
+        {
+            query = new Dictionary<string, string>();
+            if (options.Limit.HasValue) query["limit"] = options.Limit.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (!string.IsNullOrEmpty(options.Cursor)) query["cursor"] = options.Cursor!;
+            if (!string.IsNullOrEmpty(options.Status)) query["status"] = options.Status!;
+            if (query.Count == 0) query = null;
+        }
+
+        var raw = await _http.RequestAsync<DeliveriesListResponse>(HttpMethod.Get, path, query: query, ct: ct).ConfigureAwait(false);
+        var data = raw?.Deliveries ?? new List<Delivery>();
+        return new PaginatedResult<Delivery>(data, raw?.NextCursor);
+    }
+
+    /// <summary>
+    /// Fetch a single delivery by public id. Pass
+    /// <see cref="GetDeliveryOptions.IncludePayload"/> = <c>true</c> to also
+    /// receive the decrypted webhook body wrapped in a
+    /// <see cref="PayloadEnvelope"/>.
+    /// </summary>
+    public async Task<DeliveryWithPayload> GetAsync(
+        string workspaceId,
+        string deliveryId,
+        GetDeliveryOptions? options = null,
+        CancellationToken ct = default)
+    {
+        string path = $"/management/v1/workspaces/{Uri.EscapeDataString(workspaceId)}/deliveries/{Uri.EscapeDataString(deliveryId)}";
+        Dictionary<string, string>? query = null;
+
+        if (options?.IncludePayload == true)
+        {
+            query = new Dictionary<string, string> { ["include"] = "payload" };
+        }
+
+        var result = await _http.RequestAsync<DeliveryWithPayload>(HttpMethod.Get, path, query: query, ct: ct).ConfigureAwait(false);
+        return result!;
+    }
+
+    /// <summary>
+    /// List all delivery attempts for a single delivery, oldest-first.
+    /// </summary>
+    public async Task<IReadOnlyList<DeliveryAttempt>> GetAttemptsAsync(
+        string workspaceId,
+        string deliveryId,
+        CancellationToken ct = default)
+    {
+        string path = $"/management/v1/workspaces/{Uri.EscapeDataString(workspaceId)}/deliveries/{Uri.EscapeDataString(deliveryId)}/attempts";
+        var result = await _http.RequestAsync<List<DeliveryAttempt>>(HttpMethod.Get, path, ct: ct).ConfigureAwait(false);
+        return result ?? new List<DeliveryAttempt>();
+    }
+}
+
+/// <summary>
 /// Creates portal sessions for applications within a workspace.
 /// </summary>
 public sealed class PortalSessionsResource

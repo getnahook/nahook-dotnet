@@ -387,6 +387,120 @@ public sealed class ManagementIntegrationTests : IDisposable
     }
 
     // ──────────────────────────────────────────────
+    // Deliveries — reads against pre-seeded fixture rows
+    // Fixtures live in packages/db/src/seeds/test-fixtures.sql:
+    //   del_fixture_001 — delivered, hasPayload=true
+    //   del_fixture_002 — failed, 3 attempts, hasPayload=false
+    //   del_fixture_003 — delivering, hasPayload=false
+    // All scoped to ep_integration_test_001.
+    // ──────────────────────────────────────────────
+
+    [SkippableFact]
+    [Trait("Category", "Integration")]
+    [Trait("Category", "ManagementIntegration")]
+    public async Task Deliveries_List_ReturnsSeededDeliveriesWithOpaqueNextCursor()
+    {
+        Skip.If(_skip, "Management integration env vars not set");
+
+        var result = await _client!.Deliveries.ListAsync(_workspaceId!, "ep_integration_test_001", new ListDeliveriesOptions
+        {
+            Limit = 2
+        });
+
+        Assert.Equal(2, result.Data.Count);
+        Assert.Contains(result.Data, d => d.Id == "del_fixture_003");
+        // With 3 fixture rows and limit=2 we expect a non-null opaque cursor.
+        Assert.NotNull(result.NextCursor);
+        Assert.False(string.IsNullOrEmpty(result.NextCursor));
+        // Cursor must not leak the publicId format.
+        Assert.False(result.NextCursor!.StartsWith("del_", StringComparison.Ordinal));
+    }
+
+    [SkippableFact]
+    [Trait("Category", "Integration")]
+    [Trait("Category", "ManagementIntegration")]
+    public async Task Deliveries_List_WithStatusFilter_ReturnsExactlyOneFailedFixture()
+    {
+        Skip.If(_skip, "Management integration env vars not set");
+
+        var result = await _client!.Deliveries.ListAsync(_workspaceId!, "ep_integration_test_001", new ListDeliveriesOptions
+        {
+            Status = "failed"
+        });
+
+        Assert.Single(result.Data);
+        var failed = result.Data[0];
+        Assert.Equal("del_fixture_002", failed.Id);
+        Assert.Equal("failed", failed.Status);
+        Assert.Equal(3, failed.TotalAttempts);
+        Assert.False(failed.HasPayload);
+    }
+
+    [SkippableFact]
+    [Trait("Category", "Integration")]
+    [Trait("Category", "ManagementIntegration")]
+    public async Task Deliveries_Get_ReturnsMetadataWithoutEnvelopeByDefault()
+    {
+        Skip.If(_skip, "Management integration env vars not set");
+
+        var delivery = await _client!.Deliveries.GetAsync(_workspaceId!, "del_fixture_001");
+
+        Assert.Equal("del_fixture_001", delivery.Id);
+        Assert.Equal("ep_integration_test_001", delivery.EndpointId);
+        Assert.Equal("delivered", delivery.Status);
+        Assert.True(delivery.HasPayload);
+        Assert.Null(delivery.Payload);
+    }
+
+    [SkippableFact]
+    [Trait("Category", "Integration")]
+    [Trait("Category", "ManagementIntegration")]
+    public async Task Deliveries_Get_WithIncludePayload_ReturnsEnvelope()
+    {
+        Skip.If(_skip, "Management integration env vars not set");
+
+        var delivery = await _client!.Deliveries.GetAsync(_workspaceId!, "del_fixture_001", new GetDeliveryOptions
+        {
+            IncludePayload = true
+        });
+
+        Assert.NotNull(delivery.Payload);
+        // R2 wiring in the test infra may not be configured, in which case the
+        // envelope reports "error" or "not_found". All 5 statuses are valid.
+        var validStatuses = new[] { "available", "forbidden", "processing", "not_found", "error" };
+        Assert.Contains(delivery.Payload!.Status, validStatuses);
+    }
+
+    [SkippableFact]
+    [Trait("Category", "Integration")]
+    [Trait("Category", "ManagementIntegration")]
+    public async Task Deliveries_GetAttempts_ReturnsThreeFixtureAttemptsInChronologicalOrder()
+    {
+        Skip.If(_skip, "Management integration env vars not set");
+
+        var attempts = await _client!.Deliveries.GetAttemptsAsync(_workspaceId!, "del_fixture_002");
+
+        Assert.Equal(3, attempts.Count);
+        Assert.Equal(1, attempts[0].AttemptNumber);
+        Assert.Equal(2, attempts[1].AttemptNumber);
+        Assert.Equal(3, attempts[2].AttemptNumber);
+        Assert.Equal(502, attempts[0].ResponseStatusCode);
+    }
+
+    [SkippableFact]
+    [Trait("Category", "Integration")]
+    [Trait("Category", "ManagementIntegration")]
+    public async Task Deliveries_Get_Returns404ForNonExistentDelivery()
+    {
+        Skip.If(_skip, "Management integration env vars not set");
+
+        var ex = await Assert.ThrowsAsync<NahookApiException>(() =>
+            _client!.Deliveries.GetAsync(_workspaceId!, "del_does_not_exist_anywhere"));
+
+        Assert.Equal(404, ex.Status);
+    }
+
+    // ──────────────────────────────────────────────
     // Error Cases
     // ──────────────────────────────────────────────
 

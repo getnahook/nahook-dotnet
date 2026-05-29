@@ -294,6 +294,54 @@ var session = await mgmt.PortalSessions.CreateAsync("ws_abc", "app_123", new Cre
 // session.ExpiresAt -> expiration timestamp
 ```
 
+### Deliveries
+
+Read access to webhook delivery state, attempts, and (on Pro and above) the original decrypted payload.
+
+```csharp
+// Paginated list, newest-first. NextCursor is an opaque encrypted token —
+// pass it back verbatim, do not decode or modify it.
+var page = await mgmt.Deliveries.ListAsync("ws_abc", "ep_123", new ListDeliveriesOptions
+{
+    Limit = 50,
+});
+// page.Data       -> IReadOnlyList<Delivery>
+// page.NextCursor -> string? (null when there are no more pages)
+
+if (page.NextCursor != null)
+{
+    var next = await mgmt.Deliveries.ListAsync("ws_abc", "ep_123", new ListDeliveriesOptions
+    {
+        Cursor = page.NextCursor,
+    });
+}
+
+// Filter by status
+var failed = await mgmt.Deliveries.ListAsync("ws_abc", "ep_123", new ListDeliveriesOptions
+{
+    Status = "failed",
+});
+
+// Get a single delivery's status + metadata
+var delivery = await mgmt.Deliveries.GetAsync("ws_abc", "del_xyz");
+
+// Get a delivery with its decrypted payload. The response wraps the body in
+// an envelope whose Status field describes whether the payload is available,
+// gated by plan ("forbidden"), still in flight ("processing"), or absent.
+var withPayload = await mgmt.Deliveries.GetAsync("ws_abc", "del_xyz", new GetDeliveryOptions
+{
+    IncludePayload = true,
+});
+if (withPayload.Payload?.Status == "available")
+{
+    // withPayload.Payload.Data is a JsonElement? carrying the original webhook body
+    Console.WriteLine(withPayload.Payload.Data);
+}
+
+// List the attempt history for a delivery
+var attempts = await mgmt.Deliveries.GetAttemptsAsync("ws_abc", "del_xyz");
+```
+
 ---
 
 ## Error Handling

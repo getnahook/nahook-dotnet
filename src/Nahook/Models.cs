@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Nahook;
@@ -382,6 +383,209 @@ public sealed class ListOptions
 {
     public int? Limit { get; set; }
     public int? Offset { get; set; }
+}
+
+// ──────────────────────────────────────────────
+// Deliveries
+// ──────────────────────────────────────────────
+
+/// <summary>
+/// A webhook delivery record. Identifiers are public ids (prefixed). Timestamps
+/// are ISO-8601 strings as returned by the API.
+/// </summary>
+public sealed class Delivery
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("idempotencyKey")]
+    public string IdempotencyKey { get; set; } = string.Empty;
+
+    [JsonPropertyName("endpointId")]
+    public string EndpointId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// One of <c>pending</c>, <c>delivering</c>, <c>delivered</c>,
+    /// <c>scheduled_retry</c>, <c>failed</c>, <c>dead_letter</c>.
+    /// </summary>
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+
+    [JsonPropertyName("totalAttempts")]
+    public int TotalAttempts { get; set; }
+
+    [JsonPropertyName("firstAttemptAt")]
+    public string? FirstAttemptAt { get; set; }
+
+    [JsonPropertyName("deliveredAt")]
+    public string? DeliveredAt { get; set; }
+
+    [JsonPropertyName("nextRetryAt")]
+    public string? NextRetryAt { get; set; }
+
+    [JsonPropertyName("hasPayload")]
+    public bool HasPayload { get; set; }
+
+    [JsonPropertyName("createdAt")]
+    public string CreatedAt { get; set; } = string.Empty;
+
+    [JsonPropertyName("updatedAt")]
+    public string UpdatedAt { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// A single delivery attempt. <c>Status</c> is an opaque string emitted by the
+/// worker (e.g. <c>success</c>, <c>failed</c>) — model as a string, not an enum,
+/// because the set may evolve server-side.
+/// </summary>
+public sealed class DeliveryAttempt
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("attemptNumber")]
+    public int AttemptNumber { get; set; }
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+
+    [JsonPropertyName("responseStatusCode")]
+    public int? ResponseStatusCode { get; set; }
+
+    [JsonPropertyName("responseTimeMs")]
+    public int? ResponseTimeMs { get; set; }
+
+    [JsonPropertyName("errorMessage")]
+    public string? ErrorMessage { get; set; }
+
+    [JsonPropertyName("createdAt")]
+    public string CreatedAt { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Tagged envelope returned when fetching a delivery with
+/// <c>includePayload=true</c>. <see cref="Status"/> describes whether the
+/// payload was retrievable; <see cref="Data"/> and <see cref="ContentType"/>
+/// are only populated when <c>Status == "available"</c>.
+/// </summary>
+/// <remarks>
+/// Valid statuses: <c>available</c>, <c>forbidden</c>, <c>processing</c>,
+/// <c>not_found</c>, <c>error</c>. These are surfaced unchanged from the API —
+/// they are not exceptions and the SDK does not raise on them.
+/// </remarks>
+public sealed class PayloadEnvelope
+{
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The decrypted webhook body. Only present when <see cref="Status"/> is
+    /// <c>available</c>. Use <see cref="JsonElement"/> methods to inspect or
+    /// deserialise into a concrete type.
+    /// </summary>
+    [JsonPropertyName("data")]
+    public JsonElement? Data { get; set; }
+
+    /// <summary>
+    /// MIME type of <see cref="Data"/>. Only present when <see cref="Status"/>
+    /// is <c>available</c>. Currently always <c>application/json</c>.
+    /// </summary>
+    [JsonPropertyName("contentType")]
+    public string? ContentType { get; set; }
+}
+
+/// <summary>
+/// A <see cref="Delivery"/> optionally accompanied by a <see cref="PayloadEnvelope"/>.
+/// The <see cref="Payload"/> field is only populated when the SDK call used
+/// <c>includePayload=true</c>; otherwise it is <c>null</c>.
+/// </summary>
+public sealed class DeliveryWithPayload
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("idempotencyKey")]
+    public string IdempotencyKey { get; set; } = string.Empty;
+
+    [JsonPropertyName("endpointId")]
+    public string EndpointId { get; set; } = string.Empty;
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+
+    [JsonPropertyName("totalAttempts")]
+    public int TotalAttempts { get; set; }
+
+    [JsonPropertyName("firstAttemptAt")]
+    public string? FirstAttemptAt { get; set; }
+
+    [JsonPropertyName("deliveredAt")]
+    public string? DeliveredAt { get; set; }
+
+    [JsonPropertyName("nextRetryAt")]
+    public string? NextRetryAt { get; set; }
+
+    [JsonPropertyName("hasPayload")]
+    public bool HasPayload { get; set; }
+
+    [JsonPropertyName("createdAt")]
+    public string CreatedAt { get; set; } = string.Empty;
+
+    [JsonPropertyName("updatedAt")]
+    public string UpdatedAt { get; set; } = string.Empty;
+
+    [JsonPropertyName("payload")]
+    public PayloadEnvelope? Payload { get; set; }
+}
+
+/// <summary>
+/// Generic cursor-paginated container. <see cref="NextCursor"/> is the opaque
+/// token to pass back on the next call to fetch the next page, or <c>null</c>
+/// when there are no more pages.
+/// </summary>
+public sealed record PaginatedResult<T>(IReadOnlyList<T> Data, string? NextCursor);
+
+/// <summary>
+/// Optional query parameters for listing deliveries scoped to an endpoint.
+/// All fields are optional; omitted fields are not sent on the wire.
+/// </summary>
+public sealed class ListDeliveriesOptions
+{
+    /// <summary>Page size. Server default is 50, maximum 100.</summary>
+    public int? Limit { get; set; }
+
+    /// <summary>Opaque cursor returned by a previous <c>list()</c> call. Pass verbatim.</summary>
+    public string? Cursor { get; set; }
+
+    /// <summary>
+    /// Filter to a single status: <c>pending</c>, <c>delivering</c>,
+    /// <c>delivered</c>, <c>scheduled_retry</c>, <c>failed</c>, <c>dead_letter</c>.
+    /// </summary>
+    public string? Status { get; set; }
+}
+
+/// <summary>
+/// Optional query parameters for fetching a single delivery.
+/// </summary>
+public sealed class GetDeliveryOptions
+{
+    /// <summary>
+    /// When <c>true</c>, the API returns the decrypted webhook body wrapped in
+    /// a <see cref="PayloadEnvelope"/>. Plan-gated server-side.
+    /// </summary>
+    public bool? IncludePayload { get; set; }
+}
+
+// Internal wire shape for the paginated list response. We rename the array
+// field from "deliveries" to PaginatedResult.Data at the SDK boundary so the
+// container is generic across resources.
+internal sealed class DeliveriesListResponse
+{
+    [JsonPropertyName("deliveries")]
+    public List<Delivery>? Deliveries { get; set; }
+
+    [JsonPropertyName("nextCursor")]
+    public string? NextCursor { get; set; }
 }
 
 // ──────────────────────────────────────────────
