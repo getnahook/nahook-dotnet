@@ -61,6 +61,70 @@ var client = new NahookClient("nhk_us_...", new NahookClientOptions
 
 For unit tests, mock the SDK client at the dependency injection boundary. For integration tests, override the base URL to point at a local server.
 
+### Advanced HTTP configuration
+
+The SDK ships with a `SocketsHttpHandler` configured for keep-alive plus a 5-minute
+`PooledConnectionLifetime` — the pool cycles connections (and re-resolves DNS) instead
+of pinning to the IP that was resolved at process start. Without this, a long-running
+process can keep talking to a stale IP after a deploy / failover / DNS change. The
+defaults are:
+
+| Setting | Value |
+|---|---|
+| `PooledConnectionLifetime` | 5 minutes |
+| `PooledConnectionIdleTimeout` | 2 minutes |
+| `MaxConnectionsPerServer` | 50 |
+| `AutomaticDecompression` | All |
+
+For most apps the defaults are enough. Two escape hatches when you want more control:
+
+**Plug in an `IHttpClientFactory` client.** This is the recommended pattern in ASP.NET
+DI — let the framework manage `HttpClient` lifetime and any handler pipeline (Polly,
+auth refresh, telemetry, etc.):
+
+```csharp
+// Program.cs
+builder.Services.AddHttpClient("nahook")
+    .AddPolicyHandler(Policy<HttpResponseMessage>
+        .Handle<HttpRequestException>()
+        .OrResult(r => (int)r.StatusCode >= 500)
+        .WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))));
+
+// usage
+var httpClient = httpClientFactory.CreateClient("nahook");
+var client = new NahookClient("nhk_us_...", new NahookClientOptions
+{
+    HttpClient = httpClient,
+});
+```
+
+When `HttpClient` is supplied, the SDK uses it verbatim. The caller-set
+`HttpClient.Timeout` governs request timeouts (and is what `NahookTimeoutException.TimeoutMs`
+reports). The SDK will NOT dispose the supplied `HttpClient` on `NahookClient.Dispose()` —
+the caller owns its lifecycle.
+
+**Supply only a handler.** When you want the SDK to manage the `HttpClient` but still
+swap the underlying handler:
+
+```csharp
+var handler = new SocketsHttpHandler
+{
+    PooledConnectionLifetime = TimeSpan.FromMinutes(1),
+    Proxy = new WebProxy("http://corp-proxy:8080"),
+    SslOptions = new SslClientAuthenticationOptions { /* mTLS, etc. */ },
+};
+
+var client = new NahookClient("nhk_us_...", new NahookClientOptions
+{
+    Handler = handler,
+});
+```
+
+The SDK wraps the handler in its own `HttpClient` and disposes that wrapper on
+`Dispose()`, but does NOT dispose the handler — the caller owns it. Ignored when
+`HttpClient` is also supplied. The same `HttpClient` and `Handler` options are accepted
+by `NahookManagementOptions`.
+
 ### Send to a specific endpoint
 
 ```csharp

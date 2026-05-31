@@ -27,7 +27,9 @@ public sealed class NahookManagement : IDisposable
             token: token,
             baseUrl: options?.BaseUrl,
             timeoutMs: options?.TimeoutMs,
-            retries: 0 // Management client never retries.
+            retries: 0, // Management client never retries.
+            httpClient: options?.HttpClient,
+            handler: options?.Handler
         );
 
         Endpoints = new EndpointsResource(_http);
@@ -39,29 +41,17 @@ public sealed class NahookManagement : IDisposable
         Deliveries = new DeliveriesResource(_http);
     }
 
-    // Internal constructor for testing with a custom handler.
+    // Internal constructor for testing with a custom handler. Delegates to the
+    // public path via Options.Handler so resolution + ownership semantics live
+    // in exactly one place.
     internal NahookManagement(string token, HttpMessageHandler handler, NahookManagementOptions? options = null)
+        : this(token, new NahookManagementOptions
+        {
+            BaseUrl = options?.BaseUrl,
+            TimeoutMs = options?.TimeoutMs,
+            Handler = handler,
+        })
     {
-        if (string.IsNullOrWhiteSpace(token))
-            throw new ArgumentException("Management token must not be empty.", nameof(token));
-        if (!token.StartsWith("nhm_", StringComparison.Ordinal))
-            throw new ArgumentException("Management token must start with 'nhm_'.", nameof(token));
-
-        _http = new NahookHttpClient(
-            token: token,
-            handler: handler,
-            baseUrl: options?.BaseUrl,
-            timeoutMs: options?.TimeoutMs,
-            retries: 0
-        );
-
-        Endpoints = new EndpointsResource(_http);
-        EventTypes = new EventTypesResource(_http);
-        Applications = new ApplicationsResource(_http);
-        Subscriptions = new SubscriptionsResource(_http);
-        PortalSessions = new PortalSessionsResource(_http);
-        Environments = new EnvironmentsResource(_http);
-        Deliveries = new DeliveriesResource(_http);
     }
 
     public EndpointsResource Endpoints { get; }
@@ -88,4 +78,21 @@ public sealed class NahookManagementOptions
 
     /// <summary>Request timeout in milliseconds. Defaults to 30000.</summary>
     public int? TimeoutMs { get; init; }
+
+    /// <summary>
+    /// Optional <see cref="System.Net.Http.HttpClient"/> to use for all requests. When supplied,
+    /// the SDK uses it verbatim and will NOT dispose it on <see cref="NahookManagement.Dispose"/> —
+    /// the caller owns disposal. Use this to integrate with <c>IHttpClientFactory</c>, Polly,
+    /// or any handler pipeline configured at the DI level. The caller-set <c>HttpClient.Timeout</c>
+    /// governs request timeouts and is reported by <see cref="NahookTimeoutException"/>.
+    /// </summary>
+    public HttpClient? HttpClient { get; init; }
+
+    /// <summary>
+    /// Optional <see cref="HttpMessageHandler"/> wrapped into the SDK-owned <see cref="System.Net.Http.HttpClient"/>.
+    /// The SDK disposes the wrapping <c>HttpClient</c> on <see cref="NahookManagement.Dispose"/> but
+    /// NOT the supplied handler — the caller owns the handler's lifecycle. Ignored when
+    /// <see cref="HttpClient"/> is also supplied.
+    /// </summary>
+    public HttpMessageHandler? Handler { get; init; }
 }

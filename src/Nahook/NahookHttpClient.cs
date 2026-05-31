@@ -16,7 +16,7 @@ internal sealed class NahookHttpClient : IDisposable
     private const int DefaultTimeoutMs = 30_000;
     internal const int BaseDelayMs = 500;
     internal const int MaxDelayMs = 10_000;
-    private const string SdkVersion = "0.1.0";
+    private const string SdkVersion = "0.2.0";
 
     private static readonly Dictionary<string, string> RegionBaseUrls = new()
     {
@@ -48,30 +48,66 @@ internal sealed class NahookHttpClient : IDisposable
     private readonly int _retries;
     private readonly bool _ownsHttpClient;
 
-    public NahookHttpClient(string token, string? baseUrl = null, int? timeoutMs = null, int? retries = null)
+    public NahookHttpClient(
+        string token,
+        string? baseUrl = null,
+        int? timeoutMs = null,
+        int? retries = null,
+        HttpClient? httpClient = null,
+        HttpMessageHandler? handler = null)
     {
         _token = token;
         _baseUrl = (baseUrl ?? ResolveBaseUrl(token)).TrimEnd('/');
-        _timeoutMs = timeoutMs ?? DefaultTimeoutMs;
         _retries = retries ?? 0;
 
-        _httpClient = new HttpClient();
+        if (httpClient is not null)
+        {
+            // Caller-owned HttpClient: use verbatim, do not dispose on our Dispose.
+            // The caller's HttpClient.Timeout governs request timeouts — mirror it
+            // so NahookTimeoutException.TimeoutMs reflects the value the caller actually set.
+            _httpClient = httpClient;
+            _ownsHttpClient = false;
+            _timeoutMs = httpClient.Timeout == Timeout.InfiniteTimeSpan
+                ? (timeoutMs ?? DefaultTimeoutMs)
+                : (int)httpClient.Timeout.TotalMilliseconds;
+        }
+        else if (handler is not null)
+        {
+            // Caller-owned handler: wrap in a fresh HttpClient that we own and dispose,
+            // but tell the wrapper not to dispose the handler underneath.
+            _httpClient = new HttpClient(handler, disposeHandler: false);
+            _ownsHttpClient = true;
+            _timeoutMs = timeoutMs ?? DefaultTimeoutMs;
+        }
+        else
+        {
+            // Default: build a SocketsHttpHandler with a 5-minute connection lifetime so the
+            // pool cycles connections (and re-resolves DNS) instead of pinning to the IP that
+            // was resolved at process start. Without this, a deploy / failover / DNS change
+            // can leave a long-running process talking to a stale IP.
+            _httpClient = new HttpClient(BuildDefaultHandler());
+            _ownsHttpClient = true;
+            _timeoutMs = timeoutMs ?? DefaultTimeoutMs;
+        }
+
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"nahook-dotnet/{SdkVersion}");
-        _ownsHttpClient = true;
     }
 
-    // Internal constructor for testing — accepts a custom HttpMessageHandler.
+    // Internal test seam — kept for back-compat with the existing test suite.
+    // Delegates to the public ctor via Options.Handler so resolution + ownership
+    // semantics stay in exactly one place.
     internal NahookHttpClient(string token, HttpMessageHandler handler, string? baseUrl = null, int? timeoutMs = null, int? retries = null)
+        : this(token, baseUrl, timeoutMs, retries, httpClient: null, handler: handler)
     {
-        _token = token;
-        _baseUrl = (baseUrl ?? ResolveBaseUrl(token)).TrimEnd('/');
-        _timeoutMs = timeoutMs ?? DefaultTimeoutMs;
-        _retries = retries ?? 0;
-
-        _httpClient = new HttpClient(handler, disposeHandler: false);
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"nahook-dotnet/{SdkVersion}");
-        _ownsHttpClient = true;
     }
+
+    private static SocketsHttpHandler BuildDefaultHandler() => new()
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+        PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+        MaxConnectionsPerServer = 50,
+        AutomaticDecompression = DecompressionMethods.All,
+    };
 
     public async Task<T?> RequestAsync<T>(HttpMethod method, string path, object? body = null, Dictionary<string, string>? query = null, CancellationToken ct = default)
     {
@@ -135,12 +171,21 @@ internal sealed class NahookHttpClient : IDisposable
         }
 
         HttpResponseMessage response;
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(_timeoutMs);
 
         try
         {
-            response = await _httpClient.SendAsync(request, cts.Token).ConfigureAwait(false);
+            if (_ownsHttpClient)
+            {
+                // SDK-owned HttpClient — apply per-request CancelAfter for granular timeout.
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(_timeoutMs);
+                response = await _httpClient.SendAsync(request, cts.Token).ConfigureAwait(false);
+            }
+            else
+            {
+                // Caller-owned HttpClient — caller's HttpClient.Timeout governs.
+                response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {

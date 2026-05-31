@@ -31,25 +31,24 @@ public sealed class NahookClient : IDisposable
             token: apiKey,
             baseUrl: options?.BaseUrl,
             timeoutMs: options?.TimeoutMs,
-            retries: options?.Retries ?? 0
+            retries: options?.Retries ?? 0,
+            httpClient: options?.HttpClient,
+            handler: options?.Handler
         );
     }
 
-    // Internal constructor for testing with a custom handler.
+    // Internal constructor for testing with a custom handler. Delegates to the
+    // public path via Options.Handler so resolution + ownership semantics live
+    // in exactly one place.
     internal NahookClient(string apiKey, HttpMessageHandler handler, NahookClientOptions? options = null)
+        : this(apiKey, new NahookClientOptions
+        {
+            BaseUrl = options?.BaseUrl,
+            TimeoutMs = options?.TimeoutMs,
+            Retries = options?.Retries,
+            Handler = handler,
+        })
     {
-        if (string.IsNullOrWhiteSpace(apiKey))
-            throw new ArgumentException("API key must not be empty.", nameof(apiKey));
-        if (!apiKey.StartsWith("nhk_", StringComparison.Ordinal))
-            throw new ArgumentException("API key must start with 'nhk_'.", nameof(apiKey));
-
-        _http = new NahookHttpClient(
-            token: apiKey,
-            handler: handler,
-            baseUrl: options?.BaseUrl,
-            timeoutMs: options?.TimeoutMs,
-            retries: options?.Retries ?? 0
-        );
     }
 
     /// <summary>
@@ -123,4 +122,21 @@ public sealed class NahookClientOptions
 
     /// <summary>Number of retries for retryable errors. Defaults to 0.</summary>
     public int? Retries { get; init; }
+
+    /// <summary>
+    /// Optional <see cref="System.Net.Http.HttpClient"/> to use for all requests. When supplied,
+    /// the SDK uses it verbatim and will NOT dispose it on <see cref="NahookClient.Dispose"/> —
+    /// the caller owns disposal. Use this to integrate with <c>IHttpClientFactory</c>, Polly,
+    /// or any handler pipeline configured at the DI level. The caller-set <c>HttpClient.Timeout</c>
+    /// governs request timeouts and is reported by <see cref="NahookTimeoutException"/>.
+    /// </summary>
+    public HttpClient? HttpClient { get; init; }
+
+    /// <summary>
+    /// Optional <see cref="HttpMessageHandler"/> wrapped into the SDK-owned <see cref="System.Net.Http.HttpClient"/>.
+    /// The SDK disposes the wrapping <c>HttpClient</c> on <see cref="NahookClient.Dispose"/> but
+    /// NOT the supplied handler — the caller owns the handler's lifecycle. Ignored when
+    /// <see cref="HttpClient"/> is also supplied.
+    /// </summary>
+    public HttpMessageHandler? Handler { get; init; }
 }

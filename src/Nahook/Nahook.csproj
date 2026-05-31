@@ -11,7 +11,7 @@
 
     <!-- NuGet package metadata -->
     <PackageId>Nahook</PackageId>
-    <Version>0.1.1</Version>
+    <Version>0.2.0</Version>
     <Authors>Nahook</Authors>
     <Company>Nahook</Company>
     <Description>Official .NET SDK for the Nahook webhook notification platform.</Description>
