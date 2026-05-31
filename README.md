@@ -79,16 +79,13 @@ defaults are:
 For most apps the defaults are enough. Two escape hatches when you want more control:
 
 **Plug in an `IHttpClientFactory` client.** This is the recommended pattern in ASP.NET
-DI — let the framework manage `HttpClient` lifetime and any handler pipeline (Polly,
-auth refresh, telemetry, etc.):
+DI — let the framework manage `HttpClient` lifetime and attach any delegating handlers
+you've configured (retries, auth refresh, OpenTelemetry, etc.):
 
 ```csharp
-// Program.cs
+// Program.cs — your usual handler pipeline registration:
 builder.Services.AddHttpClient("nahook")
-    .AddPolicyHandler(Policy<HttpResponseMessage>
-        .Handle<HttpRequestException>()
-        .OrResult(r => (int)r.StatusCode >= 500)
-        .WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))));
+    .AddHttpMessageHandler<MyRetryHandler>();
 
 // usage
 var httpClient = httpClientFactory.CreateClient("nahook");
@@ -100,8 +97,8 @@ var client = new NahookClient("nhk_us_...", new NahookClientOptions
 
 When `HttpClient` is supplied, the SDK uses it verbatim. The caller-set
 `HttpClient.Timeout` governs request timeouts (and is what `NahookTimeoutException.TimeoutMs`
-reports). The SDK will NOT dispose the supplied `HttpClient` on `NahookClient.Dispose()` —
-the caller owns its lifecycle.
+reports). The SDK will NOT dispose the supplied `HttpClient` on `NahookClient.Dispose()`
+and will NOT touch its `DefaultRequestHeaders` — the caller owns its lifecycle.
 
 **Supply only a handler.** When you want the SDK to manage the `HttpClient` but still
 swap the underlying handler:

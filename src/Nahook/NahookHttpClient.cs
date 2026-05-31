@@ -62,14 +62,12 @@ internal sealed class NahookHttpClient : IDisposable
 
         if (httpClient is not null)
         {
-            // Caller-owned HttpClient: use verbatim, do not dispose on our Dispose.
-            // The caller's HttpClient.Timeout governs request timeouts — mirror it
-            // so NahookTimeoutException.TimeoutMs reflects the value the caller actually set.
+            // Caller-owned HttpClient: use verbatim, do not dispose on our Dispose,
+            // do not mutate its DefaultRequestHeaders. The caller's HttpClient.Timeout
+            // governs request timeouts and is what NahookTimeoutException.TimeoutMs reports.
             _httpClient = httpClient;
             _ownsHttpClient = false;
-            _timeoutMs = httpClient.Timeout == Timeout.InfiniteTimeSpan
-                ? (timeoutMs ?? DefaultTimeoutMs)
-                : (int)httpClient.Timeout.TotalMilliseconds;
+            _timeoutMs = (int)httpClient.Timeout.TotalMilliseconds;
         }
         else if (handler is not null)
         {
@@ -89,8 +87,6 @@ internal sealed class NahookHttpClient : IDisposable
             _ownsHttpClient = true;
             _timeoutMs = timeoutMs ?? DefaultTimeoutMs;
         }
-
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"nahook-dotnet/{SdkVersion}");
     }
 
     // Internal test seam — kept for back-compat with the existing test suite.
@@ -163,6 +159,7 @@ internal sealed class NahookHttpClient : IDisposable
         using var request = new HttpRequestMessage(method, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.UserAgent.ParseAdd($"nahook-dotnet/{SdkVersion}");
 
         if (body != null)
         {

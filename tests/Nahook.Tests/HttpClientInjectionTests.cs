@@ -283,13 +283,13 @@ public sealed class HandlerInjectionTests
 }
 
 // ──────────────────────────────────────────────
-// HttpClient reuse across N consecutive calls
+// HttpClient is not reconstructed per request
 // ──────────────────────────────────────────────
 
 public sealed class HttpClientReuseTests
 {
     [Fact]
-    public async Task SDK_reuses_HttpClient_across_N_calls()
+    public async Task SDK_does_not_reconstruct_HttpClient_per_request()
     {
         var counter = new CountingHandler();
         using var client = new NahookClient("nhk_us_test", new NahookClientOptions
@@ -297,6 +297,9 @@ public sealed class HttpClientReuseTests
             Handler = counter,
             BaseUrl = "https://test.nahook.com"
         });
+
+        // Snapshot HttpClient identity before any calls.
+        var before = HttpClientReflection.GetClientHttpClient(client);
 
         for (int i = 0; i < 5; i++)
         {
@@ -307,10 +310,70 @@ public sealed class HttpClientReuseTests
         }
 
         Assert.Equal(5, counter.RequestCount);
-        // Same HttpClient instance across all 5 calls — not reconstructed per request.
-        var first = HttpClientReflection.GetClientHttpClient(client);
-        var second = HttpClientReflection.GetClientHttpClient(client);
-        Assert.Same(first, second);
+        // Same HttpClient instance after 5 sends — SDK didn't swap it underneath.
+        // (Proves the SDK-level contract; TCP socket reuse would need an integration test.)
+        Assert.Same(before, HttpClientReflection.GetClientHttpClient(client));
+    }
+}
+
+// ──────────────────────────────────────────────
+// User-Agent semantics — must not mutate caller-owned HttpClient
+// ──────────────────────────────────────────────
+
+public sealed class UserAgentTests
+{
+    [Fact]
+    public void Caller_owned_HttpClient_DefaultRequestHeaders_UserAgent_is_not_mutated()
+    {
+        var customClient = new HttpClient(new TestHttpMessageHandler());
+        Assert.Empty(customClient.DefaultRequestHeaders.UserAgent);
+
+        // Two NahookClient instances over the same shared HttpClient — repeated
+        // construction must not accumulate UA entries on the caller's object.
+        var nahook1 = new NahookClient("nhk_us_test", new NahookClientOptions
+        {
+            HttpClient = customClient
+        });
+        var nahook2 = new NahookClient("nhk_us_test", new NahookClientOptions
+        {
+            HttpClient = customClient
+        });
+
+        Assert.Empty(customClient.DefaultRequestHeaders.UserAgent);
+
+        nahook1.Dispose();
+        nahook2.Dispose();
+        customClient.Dispose();
+    }
+
+    [Fact]
+    public async Task Caller_owned_HttpClient_still_sends_user_agent_on_each_request()
+    {
+        var handler = new TestHttpMessageHandler
+        {
+            ResponseBody = JsonSerializer.Serialize(new
+            {
+                deliveryId = "del_1",
+                idempotencyKey = "k",
+                status = "accepted"
+            })
+        };
+        var customClient = new HttpClient(handler);
+        using var client = new NahookClient("nhk_us_test", new NahookClientOptions
+        {
+            HttpClient = customClient,
+            BaseUrl = "https://test.nahook.com"
+        });
+
+        await client.SendAsync("ep_1", new SendOptions
+        {
+            Payload = new Dictionary<string, object>()
+        });
+
+        Assert.Contains(handler.LastRequest!.Headers.UserAgent,
+            p => p.Product != null && p.Product.Name == "nahook-dotnet");
+
+        customClient.Dispose();
     }
 }
 
