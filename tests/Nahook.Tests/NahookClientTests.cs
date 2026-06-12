@@ -672,6 +672,131 @@ public sealed class NahookManagementApplicationsTests
         Assert.Equal("ep_2", result.Id);
         Assert.Equal("https://new.example.com", result.Url);
     }
+
+    // ── maxEndpoints + showEventTypes (tri-state PATCH semantics) ──
+
+    [Fact]
+    public async Task CreateAsync_with_MaxEndpoints_includes_it_in_body()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.Created,
+            ResponseBody = JsonSerializer.Serialize(new { id = "app_2", name = "Capped", metadata = new Dictionary<string, string>(), maxEndpoints = 2, showEventTypes = true, createdAt = "2024-01-01", updatedAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Applications.CreateAsync("ws_123", new CreateApplicationOptions { Name = "Capped", MaxEndpoints = 2 });
+
+        var body = JsonDocument.Parse(handler.LastRequestBody!).RootElement;
+        Assert.Equal(2, body.GetProperty("maxEndpoints").GetInt32());
+        Assert.Equal(2, result.MaxEndpoints);
+        Assert.True(result.ShowEventTypes);
+    }
+
+    [Fact]
+    public async Task CreateAsync_with_ShowEventTypes_false_includes_it_in_body()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.Created,
+            ResponseBody = JsonSerializer.Serialize(new { id = "app_2", name = "Hidden", metadata = new Dictionary<string, string>(), maxEndpoints = (int?)null, showEventTypes = false, createdAt = "2024-01-01", updatedAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Applications.CreateAsync("ws_123", new CreateApplicationOptions { Name = "Hidden", ShowEventTypes = false });
+
+        var body = JsonDocument.Parse(handler.LastRequestBody!).RootElement;
+        Assert.False(body.GetProperty("showEventTypes").GetBoolean());
+        Assert.Null(result.MaxEndpoints);
+        Assert.False(result.ShowEventTypes);
+    }
+
+    [Fact]
+    public async Task CreateAsync_omits_unset_cap_fields()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.Created,
+            ResponseBody = JsonSerializer.Serialize(new { id = "app_2", name = "Plain", metadata = new Dictionary<string, string>(), createdAt = "2024-01-01", updatedAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        await mgmt.Applications.CreateAsync("ws_123", new CreateApplicationOptions { Name = "Plain" });
+
+        var body = JsonDocument.Parse(handler.LastRequestBody!).RootElement;
+        Assert.False(body.TryGetProperty("maxEndpoints", out _));
+        Assert.False(body.TryGetProperty("showEventTypes", out _));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_OfNull_sends_explicit_null_to_clear_the_cap()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "app_1", name = "My App", metadata = new Dictionary<string, string>(), maxEndpoints = (int?)null, showEventTypes = true, createdAt = "2024-01-01", updatedAt = "2024-01-02" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Applications.UpdateAsync("ws_123", "app_1", new UpdateApplicationOptions { MaxEndpoints = NullableInt.OfNull() });
+
+        var body = JsonDocument.Parse(handler.LastRequestBody!).RootElement;
+        Assert.True(body.TryGetProperty("maxEndpoints", out var prop), "maxEndpoints must be present as explicit null");
+        Assert.Equal(JsonValueKind.Null, prop.ValueKind);
+        Assert.Null(result.MaxEndpoints);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_omits_cap_fields_when_unset()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "app_1", name = "Renamed", metadata = new Dictionary<string, string>(), createdAt = "2024-01-01", updatedAt = "2024-01-02" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        await mgmt.Applications.UpdateAsync("ws_123", "app_1", new UpdateApplicationOptions { Name = "Renamed" });
+
+        var body = JsonDocument.Parse(handler.LastRequestBody!).RootElement;
+        Assert.False(body.TryGetProperty("maxEndpoints", out _));
+        Assert.False(body.TryGetProperty("showEventTypes", out _));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Of_sends_value_and_response_exposes_fields()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "app_1", name = "My App", metadata = new Dictionary<string, string>(), maxEndpoints = 5, showEventTypes = false, createdAt = "2024-01-01", updatedAt = "2024-01-02" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Applications.UpdateAsync("ws_123", "app_1", new UpdateApplicationOptions { MaxEndpoints = NullableInt.Of(5), ShowEventTypes = false });
+
+        var body = JsonDocument.Parse(handler.LastRequestBody!).RootElement;
+        Assert.Equal(5, body.GetProperty("maxEndpoints").GetInt32());
+        Assert.False(body.GetProperty("showEventTypes").GetBoolean());
+        Assert.Equal(5, result.MaxEndpoints);
+        Assert.False(result.ShowEventTypes);
+    }
+
+    [Fact]
+    public async Task GetAsync_response_without_cap_fields_defaults_ShowEventTypes_true()
+    {
+        using var handler = new TestHttpMessageHandler
+        {
+            ResponseStatusCode = HttpStatusCode.OK,
+            ResponseBody = JsonSerializer.Serialize(new { id = "app_1", name = "My App", metadata = new Dictionary<string, string>(), createdAt = "2024-01-01", updatedAt = "2024-01-01" })
+        };
+        using var mgmt = new NahookManagement(Token, handler, new NahookManagementOptions { BaseUrl = BaseUrl });
+
+        var result = await mgmt.Applications.GetAsync("ws_123", "app_1");
+
+        Assert.Null(result.MaxEndpoints);
+        Assert.True(result.ShowEventTypes);
+    }
 }
 
 // ──────────────────────────────────────────────

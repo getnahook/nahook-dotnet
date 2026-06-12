@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -240,6 +241,20 @@ public sealed class Application
     [JsonPropertyName("metadata")]
     public Dictionary<string, string> Metadata { get; set; } = new();
 
+    /// <summary>
+    /// Maximum endpoints this application may have (disabled endpoints
+    /// count). <c>null</c> means unlimited.
+    /// </summary>
+    [JsonPropertyName("maxEndpoints")]
+    public int? MaxEndpoints { get; set; }
+
+    /// <summary>
+    /// Whether the Developer Portal exposes the event-type catalog to this
+    /// application. Server default is <c>true</c>.
+    /// </summary>
+    [JsonPropertyName("showEventTypes")]
+    public bool ShowEventTypes { get; set; } = true;
+
     [JsonPropertyName("createdAt")]
     public string CreatedAt { get; set; } = string.Empty;
 
@@ -257,6 +272,21 @@ public sealed class CreateApplicationOptions
 
     [JsonPropertyName("metadata")]
     public Dictionary<string, string>? Metadata { get; set; }
+
+    /// <summary>
+    /// Caps how many endpoints this application may have (disabled
+    /// endpoints count). 0 makes the application read-only; <c>null</c>
+    /// (omitted) means unlimited.
+    /// </summary>
+    [JsonPropertyName("maxEndpoints")]
+    public int? MaxEndpoints { get; set; }
+
+    /// <summary>
+    /// Whether the Developer Portal exposes the event-type catalog.
+    /// <c>null</c> (omitted) defaults to <c>true</c> server-side.
+    /// </summary>
+    [JsonPropertyName("showEventTypes")]
+    public bool? ShowEventTypes { get; set; }
 }
 
 public sealed class UpdateApplicationOptions
@@ -266,6 +296,66 @@ public sealed class UpdateApplicationOptions
 
     [JsonPropertyName("metadata")]
     public Dictionary<string, string>? Metadata { get; set; }
+
+    /// <summary>
+    /// Tri-state: leave <c>null</c> to keep the current cap unchanged,
+    /// set <see cref="NullableInt.OfNull"/> to clear it (unlimited), or
+    /// <see cref="NullableInt.Of(int)"/> to set it.
+    /// </summary>
+    [JsonPropertyName("maxEndpoints")]
+    public NullableInt? MaxEndpoints { get; set; }
+
+    /// <summary>Omitted (unchanged) when <c>null</c>.</summary>
+    [JsonPropertyName("showEventTypes")]
+    public bool? ShowEventTypes { get; set; }
+}
+
+/// <summary>
+/// A JSON field that serializes as either a number or an explicit null.
+/// PATCH fields typed <see cref="NullableInt"/> are tri-state: a
+/// <c>null</c> reference is omitted from the request body entirely (leave
+/// unchanged), <see cref="OfNull"/> serializes as JSON null (clear), and
+/// <see cref="Of(int)"/> serializes as the number (set).
+/// </summary>
+[JsonConverter(typeof(NullableIntJsonConverter))]
+public sealed class NullableInt
+{
+    private NullableInt(int? value) => Value = value;
+
+    /// <summary>The number to send; <c>null</c> serializes as JSON null.</summary>
+    public int? Value { get; }
+
+    /// <summary>Returns a <see cref="NullableInt"/> carrying <paramref name="value"/>.</summary>
+    public static NullableInt Of(int value) => new(value);
+
+    /// <summary>
+    /// Returns a <see cref="NullableInt"/> that serializes as explicit JSON
+    /// null — on <see cref="UpdateApplicationOptions.MaxEndpoints"/> this
+    /// clears the cap (unlimited).
+    /// </summary>
+    public static NullableInt OfNull() => new(null);
+}
+
+internal sealed class NullableIntJsonConverter : JsonConverter<NullableInt>
+{
+    public override bool HandleNull => true;
+
+    public override NullableInt? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType == JsonTokenType.Null ? NullableInt.OfNull() : NullableInt.Of(reader.GetInt32());
+    }
+
+    public override void Write(Utf8JsonWriter writer, NullableInt value, JsonSerializerOptions options)
+    {
+        if (value.Value is null)
+        {
+            writer.WriteNullValue();
+        }
+        else
+        {
+            writer.WriteNumberValue(value.Value.Value);
+        }
+    }
 }
 
 public sealed class Subscription
