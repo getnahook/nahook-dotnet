@@ -5,6 +5,13 @@ All notable changes to this SDK are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/) and
 this project follows [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-06-12
+
+
+### Features
+
+- Application maxEndpoints + showEventTypes across all 8 SDKs
+
 ## [0.2.0] - 2026-05-31
 
 ### Features
