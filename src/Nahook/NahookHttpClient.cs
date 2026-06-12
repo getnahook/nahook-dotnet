@@ -16,7 +16,7 @@ internal sealed class NahookHttpClient : IDisposable
     private const int DefaultTimeoutMs = 30_000;
     internal const int BaseDelayMs = 500;
     internal const int MaxDelayMs = 10_000;
-    private const string SdkVersion = "0.2.0";
+    private const string SdkVersion = "0.3.0";
 
     private static readonly Dictionary<string, string> RegionBaseUrls = new()
     {

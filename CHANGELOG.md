@@ -10,7 +10,7 @@ this project follows [Semantic Versioning](https://semver.org/).
 
 ### Features
 
-- Application maxEndpoints + showEventTypes across all 8 SDKs
+- Per-application endpoint cap (`maxEndpoints`) and Developer Portal event-catalog toggle (`showEventTypes`) on the applications resource
 
 ## [0.2.0] - 2026-05-31
 
