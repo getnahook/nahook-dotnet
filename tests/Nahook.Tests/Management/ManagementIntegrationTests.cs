@@ -212,6 +212,128 @@ public sealed class ManagementIntegrationTests : IDisposable
     }
 
     // ──────────────────────────────────────────────
+    // Application MaxEndpoints Cap Lifecycle
+    // ──────────────────────────────────────────────
+
+    [SkippableFact]
+    [Trait("Category", "Integration")]
+    [Trait("Category", "ManagementIntegration")]
+    public async Task ApplicationMaxEndpointsCapLifecycle()
+    {
+        Skip.If(_skip, "Management integration env vars not set");
+
+        var uid = Uid();
+        var endpointIds = new List<string>();
+        Application? app = null;
+
+        try
+        {
+            // I1: create with MaxEndpoints=2 and ShowEventTypes=false — both echoed
+            app = await _client!.Applications.CreateAsync(_workspaceId!, new CreateApplicationOptions
+            {
+                Name = $"Cap App {uid}",
+                MaxEndpoints = 2,
+                ShowEventTypes = false
+            });
+
+            Assert.Equal(2, app.MaxEndpoints);
+            Assert.False(app.ShowEventTypes);
+
+            var fetched = await _client!.Applications.GetAsync(_workspaceId!, app.Id);
+            Assert.Equal(2, fetched.MaxEndpoints);
+            Assert.False(fetched.ShowEventTypes);
+
+            // I2: lower cap to 1 and flip ShowEventTypes — echoed and persisted
+            var updated = await _client!.Applications.UpdateAsync(_workspaceId!, app.Id, new UpdateApplicationOptions
+            {
+                MaxEndpoints = NullableInt.Of(1),
+                ShowEventTypes = true
+            });
+            Assert.Equal(1, updated.MaxEndpoints);
+            Assert.True(updated.ShowEventTypes);
+
+            fetched = await _client!.Applications.GetAsync(_workspaceId!, app.Id);
+            Assert.Equal(1, fetched.MaxEndpoints);
+            Assert.True(fetched.ShowEventTypes);
+
+            // I3: first endpoint fits under the cap; second is rejected with 403
+            var first = await _client!.Applications.CreateEndpointAsync(_workspaceId!, app.Id, new CreateEndpointOptions
+            {
+                Url = "https://httpbin.org/post",
+                Description = $"Cap test endpoint 1 {uid}"
+            });
+            endpointIds.Add(first.Id);
+            Assert.StartsWith("ep_", first.Id);
+
+            var ex = await Assert.ThrowsAsync<NahookApiException>(() =>
+                _client!.Applications.CreateEndpointAsync(_workspaceId!, app.Id, new CreateEndpointOptions
+                {
+                    Url = "https://httpbin.org/post",
+                    Description = $"Cap test endpoint 2 {uid}"
+                }));
+            Assert.Equal(403, ex.Status);
+            Assert.Equal("application_endpoint_limit_reached", ex.Code);
+
+            // I4: disabling an endpoint does not free room under the cap
+            await _client!.Endpoints.UpdateAsync(_workspaceId!, first.Id, new UpdateEndpointOptions
+            {
+                IsActive = false
+            });
+
+            ex = await Assert.ThrowsAsync<NahookApiException>(() =>
+                _client!.Applications.CreateEndpointAsync(_workspaceId!, app.Id, new CreateEndpointOptions
+                {
+                    Url = "https://httpbin.org/post",
+                    Description = $"Cap test endpoint 3 {uid}"
+                }));
+            Assert.Equal(403, ex.Status);
+            Assert.Equal("application_endpoint_limit_reached", ex.Code);
+
+            // I5: explicit JSON null clears the cap — creation succeeds again
+            var cleared = await _client!.Applications.UpdateAsync(_workspaceId!, app.Id, new UpdateApplicationOptions
+            {
+                MaxEndpoints = NullableInt.OfNull()
+            });
+            Assert.Null(cleared.MaxEndpoints);
+
+            var second = await _client!.Applications.CreateEndpointAsync(_workspaceId!, app.Id, new CreateEndpointOptions
+            {
+                Url = "https://httpbin.org/post",
+                Description = $"Cap test endpoint 4 {uid}"
+            });
+            endpointIds.Add(second.Id);
+            Assert.StartsWith("ep_", second.Id);
+        }
+        finally
+        {
+            // Cleanup (best-effort)
+            foreach (var endpointId in endpointIds)
+            {
+                try
+                {
+                    await _client!.Endpoints.DeleteAsync(_workspaceId!, endpointId);
+                }
+                catch
+                {
+                    // best-effort cleanup
+                }
+            }
+
+            if (app != null)
+            {
+                try
+                {
+                    await _client!.Applications.DeleteAsync(_workspaceId!, app.Id);
+                }
+                catch
+                {
+                    // best-effort cleanup
+                }
+            }
+        }
+    }
+
+    // ──────────────────────────────────────────────
     // Subscriptions Lifecycle
     // ──────────────────────────────────────────────
 
